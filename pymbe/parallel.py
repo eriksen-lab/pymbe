@@ -87,7 +87,7 @@ def fund(mpi, mol, calc):
 						'occup': calc.occup, 'mo_energy': calc.mo_energy}
 			mpi.comm.bcast(info, root=0)
 			# bcast mo coefficients
-			mpi.comm.Bcast([calc.mo_coeff, MPI.DOUBLE], root=0)
+			mo(mpi, calc.mo_coeff)
 		else:
 			info = mpi.comm.bcast(None, root=0)
 			calc.prop = info['prop']
@@ -95,9 +95,8 @@ def fund(mpi, mol, calc):
 			calc.ref_space = info['ref_space']; calc.exp_space = info['exp_space']
 			calc.occup = info['occup']; calc.mo_energy = info['mo_energy']
 			# receive mo coefficients
-			buff = np.zeros([mol.norb, mol.norb], dtype=np.float64)
-			mpi.comm.Bcast([buff, MPI.DOUBLE], root=0)
-			calc.mo_coeff = buff
+			calc.mo_coeff = np.zeros([mol.norb, mol.norb], dtype=np.float64)
+			mo(mpi, calc.mo_coeff)
 		if mol.atom:
 			calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, calc.mo_coeff)
 		else:
@@ -145,10 +144,20 @@ def exp(mpi, calc, exp):
 					exp.prop[calc.target]['inc'].append(buff)
 
 
+def mo(mpi, mo_coeff):
+		""" Bcast mo coefficients """
+		mpi.comm.Bcast([mo_coeff, MPI.DOUBLE], root=0)
+
+
 def mbe(mpi, prop, ndets):
-		""" Allreduce property """
+		""" Allreduce properties and number of determinants """
 		mpi.comm.Allreduce(MPI.IN_PLACE, prop, op=MPI.SUM)
 		mpi.comm.Allreduce(MPI.IN_PLACE, ndets, op=MPI.SUM)
+
+
+def rdm1(mpi, rdm1):
+		""" Allreduce rmd1s """
+		mpi.comm.Allreduce(MPI.IN_PLACE, rdm1, op=MPI.SUM)
 
 
 def screen(mpi, child_tup, child_hash, order):

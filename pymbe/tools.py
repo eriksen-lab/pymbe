@@ -134,9 +134,14 @@ def tasks(n_tuples, num_slaves, task_size):
 
 def core_cas(mol, ref_space, tup):
 		""" define core and cas spaces """
-		cas_idx = np.sort(np.append(ref_space, tup))
+		cas_idx = cas(ref_space, tup)
 		core_idx = np.setdiff1d(np.arange(mol.nocc), cas_idx)
 		return core_idx, cas_idx
+
+
+def cas(ref_space, tup):
+		""" define cas space """
+		return np.sort(np.append(ref_space, tup))
 
 
 def sigma_prune(mo_energy, orbsym, tup, mbe=False):

@@ -227,8 +227,8 @@ def _active(calc):
 
 def _orbs(calc):
 		""" orbital print """
-		if calc.orbs['type'] == 'can':
-			return 'canonical'
+		if calc.orbs['type'] in ['canonical', 'dynamic']:
+			return calc.orbs['type']
 		elif calc.orbs['type'] == 'ccsd':
 			return 'CCSD NOs'
 		elif calc.orbs['type'] == 'ccsd(t)':

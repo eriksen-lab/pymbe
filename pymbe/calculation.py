@@ -41,7 +41,7 @@ class CalcCls(object):
 				self.extra = {'hf_guess': True, 'sigma': False}
 				self.thres = {'init': 1.0e-10, 'relax': 1.0}
 				self.misc = {'mem': 2000, 'order': None, 'async': False}
-				self.orbs = {'type': 'can'}
+				self.orbs = {'type': 'canonical'}
 				self.mpi = {'masters': 1, 'task_size': 1}
 				# init mo
 				self.mo = None
@@ -212,12 +212,13 @@ class CalcCls(object):
 				tools.assertion(self.thres['relax'] >= 1.0, \
 								'threshold relaxation (relax) must be a float >= 1.0')
 				# orbital representation
-				tools.assertion(self.orbs['type'] in ['can', 'local', 'ccsd', 'ccsd(t)'], \
+				tools.assertion(self.orbs['type'] in ['canonical', 'dynamic', 'local', 'ccsd', 'ccsd(t)'], \
 								'valid occupied orbital representations (occ) are currently: '
-								'canonical (can), pipek-mezey (local), or natural orbs (ccsd or ccsd(t))')
-				if self.orbs['type'] != 'can':
+								'canonical (canonical), dynamic (dynamic), pipek-mezey (local), '
+								'or natural orbs (ccsd or ccsd(t))')
+				if self.orbs['type'] not in ['canonical', 'dynamic']:
 					tools.assertion(self.ref['method'] == 'casci', \
-									'non-canonical orbitals requires casci expansion reference')
+									'static non-canonical orbitals requires casci expansion reference')
 				if mol.atom and self.orbs['type'] == 'local':
 					tools.assertion(mol.symmetry == 'C1', \
 									'the combination of local orbs and point group symmetry '

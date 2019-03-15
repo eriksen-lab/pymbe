@@ -130,10 +130,10 @@ def mbe_results(mol, calc, exp):
 			string += ' RESULT:   mean # determinants   |      min. # determinants     |     max. # determinants\n'
 			string += DIVIDER+'\n'
 			string += ' RESULT:         {:>8.2e}        |           {:>9.3e}          |          {:>9.3e}\n'
-			cas_idx_max = tools.core_cas(mol, calc.ref_space, exp.tuples[exp.order-1][np.argmax(exp.ndets[exp.order-1])])[1]
+			cas_idx_max = tools.cas(calc.ref_space, exp.tuples[exp.order-1][np.argmax(exp.ndets[exp.order-1])])
 			nelec_max = np.asarray((np.count_nonzero(calc.occup[cas_idx_max] > 0.), \
 									np.count_nonzero(calc.occup[cas_idx_max] > 1.)), dtype=np.int32)
-			cas_idx_min = tools.core_cas(mol, calc.ref_space, exp.tuples[exp.order-1][np.argmin(exp.ndets[exp.order-1])])[1]
+			cas_idx_min = tools.cas(calc.ref_space, exp.tuples[exp.order-1][np.argmin(exp.ndets[exp.order-1])])
 			nelec_min = np.asarray((np.count_nonzero(calc.occup[cas_idx_min] > 0.), \
 									np.count_nonzero(calc.occup[cas_idx_min] > 1.)), dtype=np.int32)
 			string += ' RESULT:         --------        |           ({:>2.0f}e,{:>2.0f}o)          |          ({:>2.0f}e,{:>2.0f}o)\n'
@@ -193,10 +193,10 @@ def mbe_results(mol, calc, exp):
 			string += ' RESULT:   mean # determinants   |      min. # determinants     |     max. # determinants\n'
 			string += DIVIDER+'\n'
 			string += ' RESULT:         {:>8.2e}        |           {:>9.3e}          |          {:>9.3e}\n'
-			cas_idx_max = tools.core_cas(mol, calc.ref_space, exp.tuples[exp.order-1][np.argmax(exp.ndets[exp.order-1])])[1]
+			cas_idx_max = tools.cas(calc.ref_space, exp.tuples[exp.order-1][np.argmax(exp.ndets[exp.order-1])])
 			nelec_max = np.asarray((np.count_nonzero(calc.occup[cas_idx_max] > 0.), \
 									np.count_nonzero(calc.occup[cas_idx_max] > 1.)), dtype=np.int32)
-			cas_idx_min = tools.core_cas(mol, calc.ref_space, exp.tuples[exp.order-1][np.argmin(exp.ndets[exp.order-1])])[1]
+			cas_idx_min = tools.cas(calc.ref_space, exp.tuples[exp.order-1][np.argmin(exp.ndets[exp.order-1])])
 			nelec_min = np.asarray((np.count_nonzero(calc.occup[cas_idx_min] > 0.), \
 									np.count_nonzero(calc.occup[cas_idx_min] > 1.)), dtype=np.int32)
 			string += ' RESULT:         --------        |           ({:>2.0f}e,{:>2.0f}o)          |          ({:>2.0f}e,{:>2.0f}o)\n'

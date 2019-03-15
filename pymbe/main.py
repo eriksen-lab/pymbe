@@ -105,7 +105,7 @@ def _exp(mpi, mol, calc):
 				# read fundamental info
 				restart.read_fund(mol, calc)
 				# exp object
-				exp = expansion.ExpCls(mol, calc)
+				exp = expansion.ExpCls(mpi, mol, calc)
 			# no restart
 			else:
 				# get ao integrals
@@ -120,7 +120,7 @@ def _exp(mpi, mol, calc):
 				# base energy
 				calc.prop['base']['energy'] = kernel.base(mol, calc)
 				# exp object
-				exp = expansion.ExpCls(mol, calc)
+				exp = expansion.ExpCls(mpi, mol, calc)
 				# reference space properties
 				calc.prop['ref'][calc.target] = kernel.ref_prop(mol, calc, exp)
 				# write fundamental info
@@ -133,7 +133,7 @@ def _exp(mpi, mol, calc):
 		# exp object on slaves
 		if not mpi.master:
 			# exp object
-			exp = expansion.ExpCls(mol, calc)
+			exp = expansion.ExpCls(mpi, mol, calc)
 		# init tuples and hashes
 		exp.tuples, exp.hashes = expansion.init_tup(mol, calc)
 		# restart

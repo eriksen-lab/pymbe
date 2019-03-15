@@ -18,13 +18,15 @@ import tools
 
 class ExpCls(object):
 		""" expansion class """
-		def __init__(self, mol, calc):
+		def __init__(self, mpi, mol, calc):
 				""" init parameters """
 				# set expansion model dict
 				self.model = copy.deepcopy(calc.model)
 				# init prop dict
 				self.prop = {}
-				self.prop[calc.target] = {'inc': [], 'tot': []}
+				self.prop[calc.target] = {'inc': []}
+				if mpi.master:
+					self.prop[calc.target]['tot'] = []
 				# set max_order
 				if calc.misc['order'] is not None:
 					self.max_order = min(calc.exp_space.size, calc.misc['order'])
@@ -38,13 +40,19 @@ class ExpCls(object):
 				self.order = 0
 				# restart frequency
 				self.rst_freq = 50000
+				# rdm1
+				if calc.orbs['type'] == 'dynamic':
+					self.rdm1 = {'inc': []}
+					if mpi.master:
+						self.rdm1['tot'] = np.diag(calc.occup)
 
 
 def init_tup(mol, calc):
 		""" init tuples and hashes """
 		# tuples
 		if calc.extra['sigma']:
-			tuples = [np.array([[i] for i in calc.exp_space if tools.sigma_prune(calc.mo_energy, calc.orbsym, np.asarray([i], dtype=np.int32))], dtype=np.int32)]
+			tuples = [np.array([[i] for i in calc.exp_space if tools.sigma_prune(calc.mo_energy, \
+						calc.orbsym, np.asarray([i], dtype=np.int32))], dtype=np.int32)]
 		else:
 			tuples = [np.array([[i] for i in calc.exp_space], dtype=np.int32)]
 		# hashes
