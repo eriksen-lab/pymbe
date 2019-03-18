@@ -155,11 +155,6 @@ def mbe(mpi, prop, ndets):
 		mpi.comm.Allreduce(MPI.IN_PLACE, ndets, op=MPI.SUM)
 
 
-def rdm1(mpi, rdm1):
-		""" Allreduce rmd1s """
-		mpi.comm.Allreduce(MPI.IN_PLACE, rdm1, op=MPI.SUM)
-
-
 def screen(mpi, child_tup, child_hash, order):
 		""" Allgatherv tuples / hashes """
 		# allgatherv tuples

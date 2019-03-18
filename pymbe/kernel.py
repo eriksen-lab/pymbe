@@ -312,7 +312,6 @@ def main(mol, calc, exp, method, nelec):
 		if method in ['ccsd','ccsd(t)']:
 			# ccsd / ccsd(t) calc
 			res = _cc(mol, calc, calc.mo_coeff, exp.core_idx, exp.cas_idx, method)
-			rdm1 = None
 		elif method == 'fci':
 			# fci calc
 			res_tmp = _fci(mol, calc, calc.mo_coeff, exp.core_idx, exp.cas_idx, nelec)
@@ -323,11 +322,7 @@ def main(mol, calc, exp, method, nelec):
 			elif calc.target == 'trans':
 				res = _trans(mol, calc, exp, res_tmp['t_rdm1'], \
 								res_tmp['hf_weight'][0], res_tmp['hf_weight'][1])
-			if calc.orbs['type'] == 'dynamic':
-				rdm1 = res_tmp['rdm1']
-			else:
-				rdm1 = None
-		return res, rdm1
+		return res
 
 
 def _dipole(mol, calc, exp, cas_rdm1, trans=False):
@@ -554,7 +549,7 @@ def _fci(mol, calc, mo_coeff, core_idx, cas_idx, nelec):
 		if calc.target == 'excitation':
 			res['excitation'] = energy[-1] - energy[0]
 		# fci rdm1 and t_rdm1
-		if calc.target == 'dipole' or calc.orbs['type'] == 'dynamic':
+		if calc.target == 'dipole':
 			res['rdm1'] = solver.make_rdm1(civec[-1], cas_idx.size, nelec)
 		if calc.target == 'trans':
 			res['t_rdm1'] = solver.trans_rdm1(civec[0], civec[-1], cas_idx.size, nelec)

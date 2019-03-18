@@ -40,11 +40,6 @@ class ExpCls(object):
 				self.order = 0
 				# restart frequency
 				self.rst_freq = 50000
-				# rdm1
-				if calc.orbs['type'] == 'dynamic':
-					self.rdm1 = {'inc': []}
-					if mpi.master:
-						self.rdm1['tot'] = np.diag(calc.occup)
 
 
 def init_tup(mol, calc):
