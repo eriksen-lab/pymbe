@@ -180,13 +180,17 @@ def ref_mo(mol, calc):
 			# NOs
 			if calc.orbs['type'] in ['ccsd', 'ccsd(t)']:
 				# get rdm1
-				rdm1 = _cc(mol, calc, core_idx, cas_idx, calc.orbs['type'], True)
+				rdm1 = _cc(mol, calc, calc.mo_coeff, core_idx, cas_idx, calc.orbs['type'], True)
 				if mol.spin > 0:
 					rdm1 = rdm1[0] + rdm1[1]
-				calc.mo_coeff = _nat_orbs(mol, rdm1, calc.mo_coeff, calc.orbsym, cas_idx)
+				mo_coeff = _nat_orbs(mol, rdm1, calc.mo_coeff, calc.orbsym, cas_idx)
 			# pipek-mezey localized orbitals
 			elif calc.orbs['type'] == 'local':
-				calc.mo_coeff = _loc_orbs(mol, calc.mo_coeff, cas_idx)
+				mo_coeff = _loc_orbs(mol, calc.mo_coeff, cas_idx)
+			mo_energy = calc.mo_energy
+		else:
+			mo_coeff = calc.mo_coeff
+			mo_energy = calc.mo_energy
 		# active orbs
 		calc.ref['select'] = np.asarray(calc.ref['select'], dtype=np.int32)
 		# electrons
@@ -203,32 +207,32 @@ def ref_mo(mol, calc):
 		# divide into inactive-active-virtual
 		idx = np.asarray([i for i in range(mol.norb) if i not in calc.ref['select']])
 		if act_orbs > 0:
-			calc.mo_coeff = np.concatenate((calc.mo_coeff[:, idx[:inact_orbs]], \
-											calc.mo_coeff[:, calc.ref['select']], \
-											calc.mo_coeff[:, idx[inact_orbs:]]), axis=1)
+			mo_coeff = np.concatenate((mo_coeff[:, idx[:inact_orbs]], \
+										mo_coeff[:, calc.ref['select']], \
+										mo_coeff[:, idx[inact_orbs:]]), axis=1)
 			if mol.atom:
-				calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, calc.mo_coeff)
+				calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, mo_coeff)
 		# reference and expansion spaces
 		ref_space = np.arange(inact_orbs, inact_orbs+act_orbs)
 		exp_space = np.append(np.arange(mol.ncore, inact_orbs), np.arange(inact_orbs+act_orbs, mol.norb))
 		# casci or casscf
 		if calc.ref['method'] == 'casci':
 			if act_orbs > 0:
-				calc.mo_energy = np.concatenate((calc.mo_energy[idx[:inact_orbs]], \
-													calc.mo_energy[calc.ref['select']], \
-													calc.mo_energy[idx[inact_orbs:]]))
+				mo_energy = np.concatenate((mo_energy[idx[:inact_orbs]], \
+											mo_energy[calc.ref['select']], \
+											mo_energy[idx[inact_orbs:]]))
 		elif calc.ref['method'] == 'casscf':
 			tools.assertion(np.count_nonzero(calc.occup[calc.ref['select']] == 2.) != 0, \
 							'no occupied orbitals in CASSCF calculation')
 			tools.assertion(np.count_nonzero(calc.occup[calc.ref['select']] == 0.) != 0, \
 							'no virtual orbitals in CASSCF calculation')
 			# casscf quantities
-			calc.mo_energy, calc.mo_coeff = _casscf(mol, calc, calc.mo_coeff, ref_space, nelec)
+			mo_energy, mo_coeff = _casscf(mol, calc, mo_coeff, ref_space, nelec)
 		if mol.debug >= 1:
 			print('\n reference nelec  = {:}'.format(nelec))
 			print(' reference space  = {:}'.format(ref_space))
 			print(' expansion space  = {:}\n'.format(exp_space))
-		return calc.mo_energy, np.asarray(calc.mo_coeff, order='C'), nelec, ref_space, exp_space
+		return mo_energy, np.asarray(mo_coeff, order='C'), nelec, ref_space, exp_space
 
 
 def dyn_orbs(mpi, mol, calc, exp):
@@ -307,11 +311,11 @@ def main(mol, calc, exp, method, nelec):
 				return np.zeros(3, dtype=np.float64)
 		if method in ['ccsd','ccsd(t)']:
 			# ccsd / ccsd(t) calc
-			res = _cc(mol, calc, exp.core_idx, exp.cas_idx, method)
+			res = _cc(mol, calc, calc.mo_coeff, exp.core_idx, exp.cas_idx, method)
 			rdm1 = None
 		elif method == 'fci':
 			# fci calc
-			res_tmp = _fci(mol, calc, exp.core_idx, exp.cas_idx, nelec)
+			res_tmp = _fci(mol, calc, calc.mo_coeff, exp.core_idx, exp.cas_idx, nelec)
 			if calc.target in ['energy', 'excitation']:
 				res = res_tmp[calc.target]
 			elif calc.target == 'dipole':
@@ -361,7 +365,7 @@ def base(mol, calc):
 			e_base = 0.0
 		# ccsd / ccsd(t) base
 		elif calc.base['method'] in ['ccsd','ccsd(t)']:
-			e_base = _cc(mol, calc, core_idx, cas_idx, calc.base['method'])
+			e_base = _cc(mol, calc, calc.mo_coeff, core_idx, cas_idx, calc.base['method'])
 		return e_base
 
 
@@ -467,7 +471,7 @@ def _casscf(mol, calc, mo_coeff, ref_space, nelec):
 		return cas.mo_energy, np.asarray(cas.mo_coeff, order='C')
 
 
-def _fci(mol, calc, core_idx, cas_idx, nelec):
+def _fci(mol, calc, mo_coeff, core_idx, cas_idx, nelec):
 		""" fci calc """
 		# init fci solver
 		if calc.model['solver'] == 'pyscf_spin0':
@@ -489,7 +493,7 @@ def _fci(mol, calc, core_idx, cas_idx, nelec):
 		# wfnsym
 		solver.wfnsym = calc.state['wfnsym']
 		# get integrals and core energy
-		h1e, h2e, e_core = _prepare(mol, calc.mo_coeff, core_idx, cas_idx)
+		h1e, h2e, e_core = _prepare(mol, mo_coeff, core_idx, cas_idx)
 		# orbital symmetry
 		solver.orbsym = calc.orbsym[cas_idx]
 		# hf starting guess
@@ -558,10 +562,10 @@ def _fci(mol, calc, core_idx, cas_idx, nelec):
 		return res
 
 
-def _cc(mol, calc, core_idx, cas_idx, method, rdm=False):
+def _cc(mol, calc, mo_coeff, core_idx, cas_idx, method, rdm=False):
 		""" ccsd / ccsd(t) calc """
 		# get integrals
-		h1e, h2e, e_core = _prepare(mol, calc.mo_coeff, core_idx, cas_idx)
+		h1e, h2e, e_core = _prepare(mol, mo_coeff, core_idx, cas_idx)
 		mol_tmp = gto.M(verbose=0)
 		mol_tmp.incore_anyway = mol.incore_anyway
 		mol_tmp.max_memory = mol.max_memory
