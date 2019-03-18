@@ -274,7 +274,7 @@ def ref_prop(mol, calc, exp):
 		nelec = np.asarray((np.count_nonzero(calc.occup[exp.cas_idx] > 0.), \
 							np.count_nonzero(calc.occup[exp.cas_idx] > 1.)), dtype=np.int32)
 		# reference space prop
-		if np.any(calc.occup[calc.ref_space] == 2.) and np.any(calc.occup[calc.ref_space] == 0.):
+		if np.any(calc.occup[calc.ref_space] == 2.) and np.any(calc.occup[calc.ref_space] < 2.):
 			# exp model
 			ref = main(mol, calc, exp, calc.model['method'], nelec)
 			if calc.base['method'] is not None:
@@ -292,7 +292,7 @@ def ref_prop(mol, calc, exp):
 def main(mol, calc, exp, method, nelec):
 		""" main prop function """
 		# no occupied or no virtuals
-		if np.count_nonzero(calc.occup[exp.cas_idx] == 2.) == 0 or np.count_nonzero(calc.occup[exp.cas_idx] == 0.) == 0:
+		if np.all(calc.occup[exp.cas_idx] == 2.) or np.all(calc.occup[exp.cas_idx] == 0.):
 			if calc.target in ['energy', 'excitation']:
 				return 0.0
 			else:
@@ -347,9 +347,7 @@ def _trans(mol, calc, exp, cas_t_rdm1, hf_weight_gs, hf_weight_ex):
 def base(mol, calc):
 		""" calculate base energy and mo coefficients """
 		# set core and cas spaces
-		core_idx, cas_idx = tools.core_cas(mol, np.arange(mol.ncore), np.arange(mol.ncore, mol.norb))
-		# init rdm1
-		rdm1 = None
+		core_idx, cas_idx = tools.core_cas(mol, np.arange(mol.ncore, mol.nocc), np.arange(mol.nocc, mol.norb))
 		# no base
 		if calc.base['method'] is None:
 			e_base = 0.0
