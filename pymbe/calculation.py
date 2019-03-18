@@ -33,7 +33,7 @@ class CalcCls(object):
 				self.model = {'method': 'fci', 'solver': 'pyscf_spin0'}
 				self.target = {'energy': False, 'excitation': False, 'dipole': False, 'trans': False}
 				self.prot = {'scheme': 'new'}
-				self.ref = {'method': 'casci', 'hf_guess': True, 'active': 'manual', \
+				self.ref = {'method': 'casci', 'hf_guess': True, \
 							'select': [i for i in range(mol.ncore, mol.nelectron // 2)], \
 							'wfnsym': [symm.addons.irrep_id2name(mol.symmetry, 0) if mol.symmetry else 0]}
 				self.base = {'method': None}
@@ -139,8 +139,6 @@ class CalcCls(object):
 				if self.ref['method'] == 'casscf':
 					tools.assertion(self.model['method'] == 'fci', \
 									'a casscf reference is only meaningful for an fci expansion model')
-				tools.assertion(self.ref['active'] == 'manual', \
-								'active space choices are currently: manual')
 				tools.assertion(isinstance(self.ref['select'], list), \
 								'select key (select) for active space must be a list of orbitals')
 				tools.assertion(isinstance(self.ref['hf_guess'], bool), \

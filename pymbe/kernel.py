@@ -173,41 +173,41 @@ def _dim(hf, calc):
 
 def ref_mo(mol, calc):
 		""" determine reference mo coefficients """
-		if calc.orbs['type'] != 'canonical':
+		# transform mo coefficients 
+		if calc.orbs['type'] in ['ccsd', 'ccsd(t)', 'local']:
 			# set core and cas spaces
-			core_idx, cas_idx = tools.core_cas(mol, np.arange(mol.ncore), np.arange(mol.ncore, mol.norb))
+			core_idx, cas_idx = tools.core_cas(mol, np.arange(mol.ncore, mol.nocc), np.arange(mol.nocc, mol.norb))
 			# NOs
 			if calc.orbs['type'] in ['ccsd', 'ccsd(t)']:
+				# get rdm1
 				rdm1 = _cc(mol, calc, core_idx, cas_idx, calc.orbs['type'], True)
 				if mol.spin > 0:
 					rdm1 = rdm1[0] + rdm1[1]
-				calc.mo_coeff = _nat_orbs(mol, rdm1, calc.mo_coeff, calc.orbsym)
+				calc.mo_coeff = _nat_orbs(mol, rdm1, calc.mo_coeff, calc.orbsym, cas_idx)
 			# pipek-mezey localized orbitals
 			elif calc.orbs['type'] == 'local':
-				calc.mo_coeff = _loc_orbs(mol, calc.mo_coeff)
-		# sort mo coefficients
-		if calc.ref['active'] == 'manual':
-			# active orbs
-			calc.ref['select'] = np.asarray(calc.ref['select'], dtype=np.int32)
-			# electrons
-			nelec = (np.count_nonzero(calc.occup[calc.ref['select']] > 0.), \
-						np.count_nonzero(calc.occup[calc.ref['select']] > 1.))
-			# inactive orbitals
-			inact_elec = mol.nelectron - (nelec[0] + nelec[1])
-			tools.assertion(inact_elec % 2 == 0, 'odd number of inactive electrons')
-			inact_orbs = inact_elec // 2
-			# active orbitals
-			act_orbs = calc.ref['select'].size
-			# virtual orbitals
-			virt_orbs = mol.norb - inact_orbs - act_orbs
-			# divide into inactive-active-virtual
-			idx = np.asarray([i for i in range(mol.norb) if i not in calc.ref['select']])
-			if act_orbs > 0:
-				calc.mo_coeff = np.concatenate((calc.mo_coeff[:, idx[:inact_orbs]], \
-												calc.mo_coeff[:, calc.ref['select']], \
-												calc.mo_coeff[:, idx[inact_orbs:]]), axis=1)
-				if mol.atom:
-					calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, calc.mo_coeff)
+				calc.mo_coeff = _loc_orbs(mol, calc.mo_coeff, cas_idx)
+		# active orbs
+		calc.ref['select'] = np.asarray(calc.ref['select'], dtype=np.int32)
+		# electrons
+		nelec = (np.count_nonzero(calc.occup[calc.ref['select']] > 0.), \
+					np.count_nonzero(calc.occup[calc.ref['select']] > 1.))
+		# inactive orbitals
+		inact_elec = mol.nelectron - (nelec[0] + nelec[1])
+		tools.assertion(inact_elec % 2 == 0, 'odd number of inactive electrons')
+		inact_orbs = inact_elec // 2
+		# active orbitals
+		act_orbs = calc.ref['select'].size
+		# virtual orbitals
+		virt_orbs = mol.norb - inact_orbs - act_orbs
+		# divide into inactive-active-virtual
+		idx = np.asarray([i for i in range(mol.norb) if i not in calc.ref['select']])
+		if act_orbs > 0:
+			calc.mo_coeff = np.concatenate((calc.mo_coeff[:, idx[:inact_orbs]], \
+											calc.mo_coeff[:, calc.ref['select']], \
+											calc.mo_coeff[:, idx[inact_orbs:]]), axis=1)
+			if mol.atom:
+				calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, calc.mo_coeff)
 		# reference and expansion spaces
 		ref_space = np.arange(inact_orbs, inact_orbs+act_orbs)
 		exp_space = np.append(np.arange(mol.ncore, inact_orbs), np.arange(inact_orbs+act_orbs, mol.norb))
@@ -240,29 +240,33 @@ def dyn_orbs(mpi, mol, calc, exp):
 			calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, calc.mo_coeff)
 
 
-def _nat_orbs(mol, rdm1, mo_coeff, orbsym):
+def _nat_orbs(mol, rdm1, mo_coeff, orbsym, space):
 		""" diagonalize rdm1 to compute natural orbitals """
-		# occ-occ block
-		occup, no = symm.eigh(rdm1[:(mol.nocc-mol.ncore), :(mol.nocc-mol.ncore)], orbsym[mol.ncore:mol.nocc])
-		mo_coeff[:, mol.ncore:mol.nocc] = np.einsum('ip,pj->ij', mo_coeff[:, mol.ncore:mol.nocc], no[:, ::-1])
-		# virt-virt block
-		occup, no = symm.eigh(rdm1[mol.nocc:, mol.nocc:], orbsym[mol.nocc:])
-		mo_coeff[:, mol.nocc:] = np.einsum('ip,pj->ij', mo_coeff[:, mol.nocc:], no[:, ::-1])
+		# occ-occ part
+		occ_idx = space[space < mol.nocc]
+		occup, no = symm.eigh(rdm1[:occ_idx.size, :occ_idx.size], orbsym[occ_idx])
+		mo_coeff[:, occ_idx] = np.einsum('ip,pj->ij', mo_coeff[:, occ_idx], no[:, ::-1])
+		# virt-virt part
+		virt_idx = space[space >= mol.nocc]
+		occup, no = symm.eigh(rdm1[-virt_idx.size:, -virt_idx.size:], orbsym[virt_idx])
+		mo_coeff[:, virt_idx] = np.einsum('ip,pj->ij', mo_coeff[:, virt_idx], no[:, ::-1])
 		return mo_coeff
 
 
-def _loc_orbs(mol, mo_coeff):
+def _loc_orbs(mol, mo_coeff, space):
 		""" compute pipek-mezey localized orbitals """
-		# occ-occ block
+		# occ-occ part
+		occ_idx = space[space < mol.nocc]
 		if mol.atom:
-			mo_coeff[:, mol.ncore:mol.nocc] = lo.PM(mol, mo_coeff[:, mol.ncore:mol.nocc]).kernel()
+			mo_coeff[:, occ_idx] = lo.PM(mol, mo_coeff[:, occ_idx]).kernel()
 		else:
-			mo_coeff[:, mol.ncore:mol.nocc] = tools.hubbard_PM(mol, mo_coeff[:, mol.ncore:mol.nocc]).kernel()
-		# virt-virt block
+			mo_coeff[:, occ_idx] = tools.hubbard_PM(mol, mo_coeff[:, occ_idx]).kernel()
+		# virt-virt part
+		virt_idx = space[space >= mol.nocc]
 		if mol.atom:
-			mo_coeff[:, mol.nocc:] = lo.PM(mol, mo_coeff[:, mol.nocc:]).kernel()
+			mo_coeff[:, virt_idx] = lo.PM(mol, mo_coeff[:, virt_idx]).kernel()
 		else:
-			mo_coeff[:, mol.nocc:] = tools.hubbard_PM(mol, mo_coeff[:, mol.nocc:]).kernel()
+			mo_coeff[:, virt_idx] = tools.hubbard_PM(mol, mo_coeff[:, virt_idx]).kernel()
 		return mo_coeff
 
 
@@ -468,11 +472,9 @@ def _fci(mol, calc, core_idx, cas_idx, nelec):
 			solver = fci.direct_spin1_symm.FCI(mol)
 		# settings
 		solver.conv_tol = max(calc.thres['init'], 1.0e-10)
-#		if calc.target in ['dipole', 'trans']:
-#			solver.conv_tol *= 1.0e-04
-#			solver.lindep = solver.conv_tol * 1.0e-01
-		solver.conv_tol *= 1.0e-04
-		solver.lindep = solver.conv_tol * 1.0e-01
+		if calc.target in ['dipole', 'trans']:
+			solver.conv_tol *= 1.0e-04
+			solver.lindep = solver.conv_tol * 1.0e-01
 		solver.max_cycle = 5000
 		solver.max_space = 25
 		solver.davidson_only = True
@@ -483,7 +485,7 @@ def _fci(mol, calc, core_idx, cas_idx, nelec):
 		# wfnsym
 		solver.wfnsym = calc.state['wfnsym']
 		# get integrals and core energy
-		h1e, h2e = _prepare(mol, calc, core_idx, cas_idx)
+		h1e, h2e, e_core = _prepare(mol, calc.mo_coeff, core_idx, cas_idx)
 		# orbital symmetry
 		solver.orbsym = calc.orbsym[cas_idx]
 		# hf starting guess
@@ -500,7 +502,7 @@ def _fci(mol, calc, core_idx, cas_idx, nelec):
 		def _fci_kernel():
 				""" interface to solver.kernel """
 				# perform calc
-				e, c = solver.kernel(h1e, h2e, cas_idx.size, nelec, ecore=mol.e_core, \
+				e, c = solver.kernel(h1e, h2e, cas_idx.size, nelec, ecore=e_core, \
 										orbsym=solver.orbsym, ci0=ci0)
 				# collect results
 				if solver.nroots == 1:
@@ -555,7 +557,7 @@ def _fci(mol, calc, core_idx, cas_idx, nelec):
 def _cc(mol, calc, core_idx, cas_idx, method, rdm=False):
 		""" ccsd / ccsd(t) calc """
 		# get integrals
-		h1e, h2e = _prepare(mol, calc, core_idx, cas_idx)
+		h1e, h2e, e_core = _prepare(mol, calc.mo_coeff, core_idx, cas_idx)
 		mol_tmp = gto.M(verbose=0)
 		mol_tmp.incore_anyway = mol.incore_anyway
 		mol_tmp.max_memory = mol.max_memory
@@ -614,20 +616,20 @@ def _cc(mol, calc, core_idx, cas_idx, method, rdm=False):
 			return rdm1
 
 
-def _prepare(mol, calc, core_idx, cas_idx):
+def _prepare(mol, mo_coeff, core_idx, cas_idx):
 		""" generate input for correlated calculation """
 		# extract cas integrals and calculate core energy
 		if core_idx.size > 0:
-			core_dm = np.einsum('ip,jp->ij', calc.mo_coeff[:, core_idx], calc.mo_coeff[:, core_idx]) * 2
+			core_dm = np.einsum('ip,jp->ij', mo_coeff[:, core_idx], mo_coeff[:, core_idx]) * 2
 			vj, vk = scf.hf.dot_eri_dm(mol.eri, core_dm)
-			mol.core_vhf = vj - vk * .5
-			mol.e_core = mol.energy_nuc() + np.einsum('ij,ji', core_dm, mol.hcore)
-			mol.e_core += np.einsum('ij,ji', core_dm, mol.core_vhf) * .5
+			core_vhf = vj - vk * .5
+			e_core = mol.energy_nuc() + np.einsum('ij,ji', core_dm, mol.hcore)
+			e_core += np.einsum('ij,ji', core_dm, core_vhf) * .5
 		else:
-			mol.e_core = mol.energy_nuc()
-			mol.core_vhf = 0
-		h1e_cas = np.einsum('pi,pq,qj->ij', calc.mo_coeff[:, cas_idx], mol.hcore + mol.core_vhf, calc.mo_coeff[:, cas_idx])
-		h2e_cas = ao2mo.incore.full(mol.eri, calc.mo_coeff[:, cas_idx])
-		return h1e_cas, h2e_cas
+			core_vhf = 0
+			e_core = mol.energy_nuc()
+		h1e_cas = np.einsum('pi,pq,qj->ij', mo_coeff[:, cas_idx], mol.hcore + core_vhf, mo_coeff[:, cas_idx])
+		h2e_cas = ao2mo.incore.full(mol.eri, mo_coeff[:, cas_idx])
+		return h1e_cas, h2e_cas, e_core
 
 
