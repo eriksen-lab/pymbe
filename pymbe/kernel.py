@@ -240,34 +240,38 @@ def dyn_orbs(mpi, mol, calc, exp):
 			calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, calc.mo_coeff)
 
 
-def _nat_orbs(mol, rdm1, mo_coeff, orbsym, space):
+def _nat_orbs(mol, rdm1, mo_coeff_in, orbsym, space):
 		""" diagonalize rdm1 to compute natural orbitals """
+		# copy MOs
+		mo_coeff_out = np.copy(mo_coeff_in)
 		# occ-occ part
 		occ_idx = space[space < mol.nocc]
 		occup, no = symm.eigh(rdm1[:occ_idx.size, :occ_idx.size], orbsym[occ_idx])
-		mo_coeff[:, occ_idx] = np.einsum('ip,pj->ij', mo_coeff[:, occ_idx], no[:, ::-1])
+		mo_coeff_out[:, occ_idx] = np.einsum('ip,pj->ij', mo_coeff_in[:, occ_idx], no[:, ::-1])
 		# virt-virt part
 		virt_idx = space[space >= mol.nocc]
 		occup, no = symm.eigh(rdm1[-virt_idx.size:, -virt_idx.size:], orbsym[virt_idx])
-		mo_coeff[:, virt_idx] = np.einsum('ip,pj->ij', mo_coeff[:, virt_idx], no[:, ::-1])
-		return mo_coeff
+		mo_coeff_out[:, virt_idx] = np.einsum('ip,pj->ij', mo_coeff_in[:, virt_idx], no[:, ::-1])
+		return mo_coeff_out
 
 
-def _loc_orbs(mol, mo_coeff, space):
+def _loc_orbs(mol, mo_coeff_in, space):
 		""" compute pipek-mezey localized orbitals """
+		# copy MOs
+		mo_coeff_out = np.copy(mo_coeff_in)
 		# occ-occ part
 		occ_idx = space[space < mol.nocc]
 		if mol.atom:
-			mo_coeff[:, occ_idx] = lo.PM(mol, mo_coeff[:, occ_idx]).kernel()
+			mo_coeff_out[:, occ_idx] = lo.PM(mol, mo_coeff_in[:, occ_idx]).kernel()
 		else:
-			mo_coeff[:, occ_idx] = tools.hubbard_PM(mol, mo_coeff[:, occ_idx]).kernel()
+			mo_coeff_out[:, occ_idx] = tools.hubbard_PM(mol, mo_coeff_in[:, occ_idx]).kernel()
 		# virt-virt part
 		virt_idx = space[space >= mol.nocc]
 		if mol.atom:
-			mo_coeff[:, virt_idx] = lo.PM(mol, mo_coeff[:, virt_idx]).kernel()
+			mo_coeff_out[:, virt_idx] = lo.PM(mol, mo_coeff_in[:, virt_idx]).kernel()
 		else:
-			mo_coeff[:, virt_idx] = tools.hubbard_PM(mol, mo_coeff[:, virt_idx]).kernel()
-		return mo_coeff
+			mo_coeff_out[:, virt_idx] = tools.hubbard_PM(mol, mo_coeff_in[:, virt_idx]).kernel()
+		return mo_coeff_out
 
 
 def ref_prop(mol, calc, exp):
