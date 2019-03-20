@@ -99,6 +99,9 @@ def _master(mpi, mol, calc, exp):
 		ndets = _init_ndets(exp.tuples[-1].shape[0])
 		# allreduce increments
 		parallel.mbe(mpi, inc, ndets)
+		# update MOs
+		if calc.orbs['type'] == 'dynamic':
+			kernel.dyn_orbs(mpi, mol, calc, exp)
 		return ndets, inc
 
 
@@ -113,6 +116,9 @@ def _slave(mpi, mol, calc, exp):
 		# init increments and ndets
 		inc = _init_inc(exp.tuples[-1].shape[0], calc.target)
 		ndets = _init_ndets(exp.tuples[-1].shape[0])
+		# rdm1
+		if calc.orbs['type'] == 'dynamic':
+			exp.rdm1.fill(0.0)
 		# send availability to master
 		if mpi.rank <= num_slaves:
 			mpi.comm.Isend([None, MPI.INT], dest=0, tag=TAGS.ready)
@@ -140,6 +146,9 @@ def _slave(mpi, mol, calc, exp):
 				break
 		# allreduce increments
 		parallel.mbe(mpi, inc, ndets)
+		# update MOs
+		if calc.orbs['type'] == 'dynamic':
+			kernel.dyn_orbs(mpi, mol, calc, exp)
 		return ndets, inc
 
 

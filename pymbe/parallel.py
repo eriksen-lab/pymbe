@@ -87,7 +87,7 @@ def fund(mpi, mol, calc):
 						'occup': calc.occup, 'mo_energy': calc.mo_energy}
 			mpi.comm.bcast(info, root=0)
 			# bcast mo coefficients
-			mo(mpi, calc.mo_coeff)
+			mo_coeff(mpi, calc.mo_coeff)
 		else:
 			info = mpi.comm.bcast(None, root=0)
 			calc.prop = info['prop']
@@ -96,7 +96,7 @@ def fund(mpi, mol, calc):
 			calc.occup = info['occup']; calc.mo_energy = info['mo_energy']
 			# receive mo coefficients
 			calc.mo_coeff = np.zeros([mol.norb, mol.norb], dtype=np.float64)
-			mo(mpi, calc.mo_coeff)
+			mo_coeff(mpi, calc.mo_coeff)
 		if mol.atom:
 			calc.orbsym = symm.label_orb_symm(mol, mol.irrep_id, mol.symm_orb, calc.mo_coeff)
 		else:
@@ -144,9 +144,18 @@ def exp(mpi, calc, exp):
 					exp.prop[calc.target]['inc'].append(buff)
 
 
-def mo(mpi, mo_coeff):
+def mo_coeff(mpi, mo_coeff):
 		""" Bcast mo coefficients """
 		mpi.comm.Bcast([mo_coeff, MPI.DOUBLE], root=0)
+
+
+def rdm1(mpi, rdm1):
+		""" ALlreduce rdm1s """
+		mpi.comm.Allreduce(MPI.IN_PLACE, rdm1, op=MPI.SUM)
+#		if mpi.master:
+#			mpi.comm.Reduce([np.empty_like(rdm1), MPI.DOUBLE], [rdm1, MPI.DOUBLE], op=MPI.SUM, root=0)
+#		else:
+#			mpi.comm.Reduce([rdm1, MPI.DOUBLE], [np.empty_like(rdm1), MPI.DOUBLE], op=MPI.SUM, root=0)
 
 
 def mbe(mpi, prop, ndets):

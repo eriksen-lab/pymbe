@@ -40,6 +40,9 @@ class ExpCls(object):
 				self.order = 0
 				# restart frequency
 				self.rst_freq = 50000
+				# rdm1
+				if calc.orbs['type'] == 'dynamic':
+					self.rdm1 = np.zeros([mol.norb, mol.norb], dtype=np.float64)
 
 
 def init_tup(mol, calc):
