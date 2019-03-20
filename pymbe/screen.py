@@ -25,8 +25,6 @@ TAGS = tools.enum('start', 'ready', 'exit')
 
 def main(mpi, mol, calc, exp):
 		""" input generation for subsequent order """
-		# update expansion threshold
-		exp.thres = update(exp.order, calc.thres['init'], calc.thres['relax'])
 		# master and slave functions
 		if mpi.master:
 			# start time
@@ -46,7 +44,7 @@ def main(mpi, mol, calc, exp):
 def _master(mpi, mol, calc, exp):
 		""" master function """
 		# print header
-		print(output.screen_header(exp.thres, exp.order))
+		print(output.screen_header(exp.order))
 		# converged due to pi screening
 		if exp.order > 1 and exp.count[-1] == 0:
 			tuples = np.array([], dtype=np.int32).reshape(-1, exp.order+1)
@@ -146,6 +144,13 @@ def _test(mol, calc, exp, tup):
 		if exp.order == 1:
 			return [m for m in calc.exp_space[np.where(calc.exp_space > tup[-1])]]
 		else:
+			# set threshold
+			n_virt = np.count_nonzero(calc.occup[calc.ref_space] == 0.)
+			n_virt += np.count_nonzero(calc.occup[tup] == 0.)
+			if n_virt < 3:
+				thres = 0.0
+			else:
+				thres = calc.thres['init'] * calc.thres['relax'] ** (n_virt - 3)
 			# init return list
 			lst = []
 			# generate array with all subsets of particular tuple
@@ -179,7 +184,7 @@ def _test(mol, calc, exp, tup):
 							indx = None
 							break
 				if indx is not None:
-					if not _prot_screen(exp.thres, calc.prot['scheme'], calc.target, exp.prop, indx):
+					if not _prot_screen(thres, calc.prot['scheme'], calc.target, exp.prop, indx):
 						lst += [m]
 					else:
 						if mol.debug >= 2:
@@ -216,13 +221,5 @@ def _prot_scheme(thres, scheme, prop):
 			# are *any* increments below the threshold?
 			elif scheme == 'old':
 				return np.min(np.abs(prop)) < thres
-
-
-def update(order, thres_init, thres_relax):
-		""" update expansion threshold """
-		if order < 2:
-			return 0.0
-		else:
-			return thres_init * thres_relax ** (order - 2)
 
 

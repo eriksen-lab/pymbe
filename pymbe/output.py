@@ -211,13 +211,13 @@ def mbe_results(mol, calc, exp):
 		return string.format(*form)
 
 
-def screen_header(thres, order):
+def screen_header(order):
 		""" print screening header """
 		# set string
 		string = DIVIDER+'\n'
-		string += ' STATUS:  order k = {:} screening started (thres. = {:5.2e})\n'
+		string += ' STATUS:  order k = {:} screening started\n'
 		string += DIVIDER
-		form = (order, thres)
+		form = (order,)
 		return string.format(*form)
 
 

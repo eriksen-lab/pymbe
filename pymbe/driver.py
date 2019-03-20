@@ -33,7 +33,7 @@ def master(mpi, mol, calc, exp):
 		tools.assertion(mpi.size >= 2, 'PyMBE requires two or more MPI processes')
 		# restart
 		if calc.restart:
-			exp.thres, exp.rst_freq, calc.restart = _rst_print(mol, calc, exp)
+			exp.rst_freq, calc.restart = _rst_print(mol, calc, exp)
 		# now do expansion
 		for exp.order in range(exp.start_order, exp.max_order+1):
 			#** mbe phase **#
@@ -103,10 +103,9 @@ def _rst_print(mol, calc, exp):
 			print(output.mbe_header(exp.tuples[exp.order-1].shape[0], calc.ref_space.size + exp.tuples[exp.order-1].shape[1], exp.order))
 			print(output.mbe_end(exp.count[exp.order-1], calc.ref_space.size + exp.tuples[exp.order-1].shape[1], exp.order))
 			print(output.mbe_results(mol, calc, exp))
-			thres = screen.update(exp.order, calc.thres['init'], calc.thres['relax'])
 			print(output.screen_header(thres, exp.order))
 			print(output.screen_end(exp.tuples[exp.order-1].shape[0], exp.order))
 			rst_freq = max(rst_freq // 2, 1)
-		return thres, rst_freq, False
+		return rst_freq, False
 
 	
