@@ -360,6 +360,16 @@ def restart_write_fund(mol: MolCls, calc: CalcCls) -> None:
         # write orbital coefficients
         np.save(os.path.join(RST, 'mo_coeff'), calc.mo_coeff)
 
+        # write fock, coulomb and exchange matrixes
+        fao = calc.hf.get_fock()
+        fmo = calc.mo_coeff.T @ fao @ calc.mo_coeff
+        mocc = calc.mo_coeff[:,calc.occup>0]
+        dm = np.dot(mocc*calc.occup[calc.occup>0], mocc.T)
+        jmo, kmo = calc.hf.get_jk(mol, dm)
+        np.save(os.path.join(RST, 'fock'), fmo)
+        np.save(os.path.join(RST, 'coulomb'), jmo)
+        np.save(os.path.join(RST, 'exchange'), kmo)
+
 
 def restart_read_fund(mol: MolCls, calc: CalcCls) -> Tuple[MolCls, CalcCls]:
         """

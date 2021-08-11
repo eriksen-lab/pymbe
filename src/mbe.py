@@ -18,6 +18,8 @@ from mpi4py import MPI
 from pyscf import gto
 from typing import Tuple, Set, List, Dict, Union, Any
 
+sys.path.insert(1, '~/Promotion/regscreen/src')
+
 from kernel import e_core_h1e, hubbard_h1e, hubbard_eri, main as kernel_main
 from output import mbe_status, mbe_debug, DIVIDER
 from expansion import ExpCls

@@ -12,10 +12,13 @@ __maintainer__ = 'Dr. Janus Juul Eriksen'
 __email__ = 'janus.eriksen@bristol.ac.uk'
 __status__ = 'Development'
 
+import sys
 import numpy as np
 from mpi4py import MPI
 
-from mbe import main as mbe_main
+sys.path.append('/Users/jgreiner/Promotion/regscreen')
+
+from newmbe import main as mbe_main
 from output import main_header, mbe_header, mbe_results, mbe_end, \
                     screen_results, purge_header, purge_results, purge_end
 from purge import main as purge_main

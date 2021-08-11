@@ -34,7 +34,7 @@ class ExpCls:
 
                 # init prop dict
                 self.prop: Dict[str, Dict[str, Union[List[float], MPI.Win]]] = {str(calc.target_mbe): {'inc': [], 'tot': [], \
-                                                                                                       'hashes': []}}
+                                                                                                       'hashes': [], 'sample_mean': [], 'sample_std': []}}
 
                 # init timings and and statistics lists
                 self.time: Dict[str, Union[List[float], np.ndarray]] = {'mbe': [], 'purge': []}
