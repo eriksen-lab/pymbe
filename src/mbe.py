@@ -18,7 +18,7 @@ from mpi4py import MPI
 from pyscf import gto
 from typing import Tuple, Set, List, Dict, Union, Any
 
-from random import sample
+from random import seed, sample
 import scipy.special as sc
 
 from kernel import e_core_h1e, hubbard_h1e, hubbard_eri, main as kernel_main
@@ -33,6 +33,9 @@ from tools import is_file, read_file, write_file, inc_dim, inc_shape, \
 
 SCREEN = 1000. # random, non-sensical number
 
+# seed for random processes
+SEED = 50
+seed(SEED)
 
 def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
             rst_read: bool = False, tup_idx: int = 0, \
@@ -358,9 +361,8 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
         exp.exp_space.append(exp.exp_space[-1][np.sort(np.argsort(nonzero_screen)[::-1][:screen_idx])])
 
         if exp.order >= calc.thres['start']:
-            
-            _error_est(mol, calc, exp, ref_occ, ref_virt)
-            exit()
+
+            _error_est(mol, calc, exp, eri, hcore, vhf, inc, hashes, ref_occ, ref_virt)
 
         # write restart files
         if mpi.global_master:
@@ -519,13 +521,12 @@ def _update(min_prop: Union[float, int], max_prop: Union[float, int], \
         return np.minimum(min_prop, np.abs(tup_prop)), np.maximum(max_prop, np.abs(tup_prop)), sum_prop + tup_prop
 
 
-def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, ref_occ: bool, ref_virt: bool):
+def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.ndarray, hcore: np.ndarray, \
+               vhf: np.ndarray, inc: List[np.ndarray], hashes: List[np.ndarray], ref_occ: bool, \
+               ref_virt: bool):
         """
         this function estimates screening errors
         """
-        # define number of samples to draw from screened orbitals
-        n_sample = 20
-
         # sample tuples for the next order will be calculated
         next_order = exp.order + 1
 
@@ -551,6 +552,9 @@ def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, ref_occ: bool, ref_virt:
 
         # calculate number of tuples that are screened away at next order due to screening at this order
         n_screened = n_theo - n_actual
+
+        # define number of samples to draw from screened orbitals
+        n_samples = int(0.1 * n_screened)
 
         # tuple types describe varying amounts of the orbital types contained in screened_occ, screened_virt, new_exp_occ and new_exp_virt
         # create ranges for all tuple types
@@ -613,10 +617,13 @@ def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, ref_occ: bool, ref_virt:
         tup = np.empty(next_order, dtype=int)
 
         # draw random sample from total number of screened_orbitals
-        random_sample = sample(range(n_screened), n_sample)
+        random_sample = sample(range(n_screened), n_samples)
 
         # sort random sample
         random_sample.sort()
+
+        # create increment array
+        sample_incs = np.empty(n_samples, dtype=float)
 
         # start within first range
         range_index = 0
@@ -628,7 +635,7 @@ def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, ref_occ: bool, ref_virt:
         #for index in range(n_screened):
 
         # loop over sorted indices in sample
-        for index in random_sample:
+        for tup_idx, index in enumerate(random_sample):
 
             # check if index is in range of next tuple type
             if index >= ranges[range_index]:
@@ -657,10 +664,55 @@ def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, ref_occ: bool, ref_virt:
 
                 i += k_orbs
 
-            print(index)
-            print(tup)
+            # sort tup
+            tup.sort()
+
+            # get core and cas indices
+            core_idx, cas_idx = core_cas(mol.nocc, calc.ref_space, tup)
+
+            # get h2e indices
+            cas_idx_tril = idx_tril(cas_idx)
+
+            # get h2e_cas
+            h2e_cas = eri[cas_idx_tril[:, None], cas_idx_tril]
+
+            # compute e_core and h1e_cas
+            e_core, h1e_cas = e_core_h1e(mol.e_nuc, hcore, vhf, core_idx, cas_idx)
+
+            # calculate increment
+            sample_incs[tup_idx], _, _ = _inc(calc.model, calc.base['method'], calc.orbs['type'], mol.spin, \
+                                                  calc.occup, calc.target_mbe, calc.state, mol.groupname, \
+                                                  calc.orbsym, calc.prop, e_core, h1e_cas, h2e_cas, \
+                                                  core_idx, cas_idx, mol.debug, mol.dipole_ints)
+
+            # calculate increment
+            if next_order > exp.min_order:
+                sample_incs[tup_idx] -= _sum(mol.nocc, calc.target_mbe, exp.min_order, next_order, \
+                                inc, hashes, exp.exp_space, ref_occ, ref_virt, tup)
 
         #print(any(full_list.count(x) > 1 for x in full_list))
+
+        if n_samples > 0:
+
+            # Calculate sample mean
+            sample_mean = fsum(sample_incs) / n_samples
+
+            # Calculate sample standard deviation
+            sample_std = np.std(sample_incs, ddof=1)
+
+            # Estimate sum of all increments below threshold through sample mean
+            print('Estimated increment of screened tuples: {:>13.4e}'.format(sample_mean * n_screened))
+
+            if n_samples < n_screened:
+
+                # Estimate standard error through standard deviation of the sampling distribution through sample standard deviation
+                print('Standard error of predicted increment: {:>13.4e}'.format(sample_std * np.sqrt((1 - n_samples / n_screened) / n_samples) * n_screened))
+
+            else:
+
+                print('Standard error of predicted increment: {:>13.4e}'.format(0.0))
+
+        return
 
 
 def _orbs_from_index(i, n_orbs, k_orbs):
