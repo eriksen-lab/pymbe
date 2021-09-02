@@ -22,7 +22,7 @@ from random import seed, sample
 import scipy.special as sc
 
 from kernel import e_core_h1e, hubbard_h1e, hubbard_eri, main as kernel_main
-from output import mbe_status, mbe_debug, DIVIDER
+from output import mbe_status, mbe_debug, error_est_header, error_est_results, DIVIDER
 from expansion import ExpCls
 from system import MolCls
 from calculation import CalcCls
@@ -362,7 +362,7 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
 
         if exp.order >= calc.thres['start']:
 
-            _error_est(mol, calc, exp, eri, hcore, vhf, inc, hashes, ref_occ, ref_virt)
+            _error_est(mpi, mol, calc, exp, eri, hcore, vhf, inc, hashes, ref_occ, ref_virt)
 
         # write restart files
         if mpi.global_master:
@@ -521,7 +521,7 @@ def _update(min_prop: Union[float, int], max_prop: Union[float, int], \
         return np.minimum(min_prop, np.abs(tup_prop)), np.maximum(max_prop, np.abs(tup_prop)), sum_prop + tup_prop
 
 
-def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.ndarray, hcore: np.ndarray, \
+def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.ndarray, hcore: np.ndarray, \
                vhf: np.ndarray, inc: List[np.ndarray], hashes: List[np.ndarray], ref_occ: bool, \
                ref_virt: bool):
         """
@@ -554,10 +554,14 @@ def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.ndarray, hcore: 
         n_screened = n_theo - n_actual
 
         # define number of samples to draw from screened orbitals
-        n_samples = int(0.1 * n_screened)
+        n_samples = int(min(round(0.1 * n_screened), 1e6))
+
+        # only continue if number of screened orbitals is large enough
+        if n_samples == 0:
+            return
 
         # tuple types describe varying amounts of the orbital types contained in screened_occ, screened_virt, new_exp_occ and new_exp_virt
-        # create ranges for all tuple types
+        # create array for ranges of all tuple types
         ranges = []
 
         # create array for number of orbital types in each tuple type
@@ -623,22 +627,31 @@ def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.ndarray, hcore: 
         random_sample.sort()
 
         # create increment array
-        sample_incs = np.empty(n_samples, dtype=float)
+        sample_incs_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
+        buf = sample_incs_win.Shared_query(0)[0] # type: ignore
+        sample_incs = np.ndarray(buffer=buf, dtype=np.float64, shape=(n_samples,))
+        if mpi.local_master and not mpi.global_master:
+            sample_incs.fill(0.)
 
         # start within first range
         range_index = 0
 
+        # print header
+        if mpi.global_master:
+            print(error_est_header(exp.order, n_samples))
+
         # start without a shift until second range is reached
         shift = 0
-
-        #full_list = []
-        #for index in range(n_screened):
 
         # loop over sorted indices in sample
         for tup_idx, index in enumerate(random_sample):
 
-            # check if index is in range of next tuple type
-            if index >= ranges[range_index]:
+            # distribute tuples
+            if tup_idx % mpi.global_size != mpi.global_rank:
+                continue
+
+            # check if index is in range of another tuple type
+            while index >= ranges[range_index]:
 
                 shift = ranges[range_index]
                 range_index += 1
@@ -690,27 +703,29 @@ def _error_est(mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.ndarray, hcore: 
                 sample_incs[tup_idx] -= _sum(mol.nocc, calc.target_mbe, exp.min_order, next_order, \
                                 inc, hashes, exp.exp_space, ref_occ, ref_virt, tup)
 
-        #print(any(full_list.count(x) > 1 for x in full_list))
+        # mpi barrier
+        mpi.global_comm.Barrier()
 
-        if n_samples > 0:
+        # reduce sample increments onto global master
+        if mpi.local_master:
+            sample_incs = mpi_reduce(mpi.master_comm, sample_incs, op=MPI.SUM)
 
-            # Calculate sample mean
+        # print results
+        if mpi.global_master and n_samples > 0:
+
+            # calculate sample mean
             sample_mean = fsum(sample_incs) / n_samples
 
-            # Calculate sample standard deviation
+            # estimate population total of all screened increments through sample mean
+            correction = n_screened * sample_mean
+
+            # calculate sample standard deviation
             sample_std = np.std(sample_incs, ddof=1)
 
-            # Estimate sum of all increments below threshold through sample mean
-            print('Estimated increment of screened tuples: {:>13.4e}'.format(sample_mean * n_screened))
+            # calculate standard error of the population total from sample mean standard deviation
+            error = sample_std * np.sqrt((1 - n_samples / n_screened) / n_samples) * n_screened
 
-            if n_samples < n_screened:
-
-                # Estimate standard error through standard deviation of the sampling distribution through sample standard deviation
-                print('Standard error of predicted increment: {:>13.4e}'.format(sample_std * np.sqrt((1 - n_samples / n_screened) / n_samples) * n_screened))
-
-            else:
-
-                print('Standard error of predicted increment: {:>13.4e}'.format(0.0))
+            print(error_est_results(exp.order, correction, 2 * error))
 
         return
 

@@ -111,7 +111,7 @@ def mbe_debug(atom: Union[List[str], str], symmetry: str, orbsym: np.ndarray, ro
         return string.format(*form)
 
 
-def mbe_status(order:int, prog: float) -> str:
+def mbe_status(order: int, prog: float) -> str:
         """
         this function prints the status of an mbe phase
         """
@@ -216,6 +216,36 @@ def mbe_results(occup: np.ndarray, target: str, root: int, min_order: int, \
         string += FILL+'\n'
         string += DIVIDER
         form += (order, order, np.asscalar(mean_ndets), np.asscalar(min_ndets), np.asscalar(max_ndets))
+
+        return string.format(*form)
+
+
+def error_est_header(order: int, n_samples: int) -> str:
+        """
+        this function prints the status of an mbe phase
+        """
+        # set string
+        string: str = DIVIDER+'\n'
+        string += FILL+'\n'
+        string += DIVIDER+'\n'
+        string += ' STATUS-{:d}:  order k = {:d} screening correction started --- sample of {:d} screened tuples\n'
+        form: Tuple[int, int, int] = (order, order + 1, n_samples,)
+        string += DIVIDER
+
+        return string.format(*form)
+
+
+def error_est_results(order: int, correction: float, error: float) -> str:
+        """
+        this function prints the updated number of tuples
+        """
+        # set string
+        string: str = FILL+'\n'
+        string += DIVIDER+'\n'
+        string += u' RESULT-{:d}:  order k = {:d} increment correction = {:.4e} \u00b1 {:.4e}\n'
+        form: Tuple[int, int, float, float] = (order, order + 1, correction, error,)
+        string += DIVIDER+'\n'
+        string += FILL+'\n'
 
         return string.format(*form)
 
