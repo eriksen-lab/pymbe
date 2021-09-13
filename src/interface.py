@@ -55,11 +55,11 @@ def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: st
         >>> h2e_cas = h2e[cas_idx_tril[:, None], cas_idx_tril]
         >>> n_elec = nelec(hf.mo_occ, cas_idx)
         >>> cc_energy, success = mbecc_interface('ccsd', 'ecc', 'can', 'C2v', orbsym[cas_idx], h1e_cas, \
-                                                 h2e_cas, n_elec, 0)
+                                                 h2e_cas, n_elec, False, 0)
         >>> np.isclose(cc_energy, -0.014118607610972705)
         True
         """
-
+        # check for path to MBECC library
         if not CCLIB_AVAILABLE:
             msg = 'settings.py not found for module interface. ' + \
             f'Please create {os.path.join(os.path.dirname(__file__), "settings.py"):}\n'
@@ -75,9 +75,10 @@ def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: st
         point_group_dict = {'C1': 1, 'C2': 2, 'Ci': 3, 'Cs': 4, 'D2': 5, 'C2v': 6, 'C2h': 7, 'D2h': 8}
 
         # settings
-        method = ctypes.c_int64(method_dict[method])
-        cc_module = ctypes.c_int64(cc_module_dict[cc_backend])
-        point_group = ctypes.c_int64(point_group_dict[point_group])
+        method_val = ctypes.c_int64(method_dict[method])
+        cc_module_val = ctypes.c_int64(cc_module_dict[cc_backend])
+        n_elec_arr = np.array(n_elec)
+        point_group_val = ctypes.c_int64(point_group_dict[point_group])
         non_canonical = ctypes.c_int64(0 if orb_type == 'can' else 1)
         maxcor = ctypes.c_int64(MAX_MEM) # max memory in integer words
         conv = ctypes.c_int64(CONV_TOL)
@@ -96,15 +97,16 @@ def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: st
         success = ctypes.c_int64() # success flag
 
         # perform cc calculation
-        cclib.cc_interface(ctypes.byref(method), ctypes.byref(cc_module),#
-            ctypes.byref(non_canonical), ctypes.byref(maxcor),#
-            n_elec.ctypes.data_as(ctypes.c_void_p), ctypes.byref(n_act),
-            orbsym.ctypes.data_as(ctypes.c_void_p), ctypes.byref(point_group),#
-            h1e.ctypes.data_as(ctypes.c_void_p),#
-            h2e.ctypes.data_as(ctypes.c_void_p), ctypes.byref(conv),#
-            ctypes.byref(max_cycle), ctypes.byref(t3_extrapol),#
-            ctypes.byref(t4_extrapol), ctypes.byref(verbose),#
-            ctypes.byref(cc_energy), ctypes.byref(success))
+        cclib.cc_interface(ctypes.byref(method_val), ctypes.byref(cc_module_val), \
+                           ctypes.byref(non_canonical), ctypes.byref(maxcor), \
+                           n_elec_arr.ctypes.data_as(ctypes.c_void_p), \
+                           ctypes.byref(n_act), orbsym.ctypes.data_as(ctypes.c_void_p), \
+                           ctypes.byref(point_group_val), \
+                           h1e.ctypes.data_as(ctypes.c_void_p), \
+                           h2e.ctypes.data_as(ctypes.c_void_p), ctypes.byref(conv), \
+                           ctypes.byref(max_cycle), ctypes.byref(t3_extrapol), \
+                           ctypes.byref(t4_extrapol), ctypes.byref(verbose), \
+                           ctypes.byref(cc_energy), ctypes.byref(success))
 
         return cc_energy.value, success.value
 

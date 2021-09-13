@@ -49,7 +49,6 @@ class ExpCls:
                 self.order: int = 0
 
                 # init attributes
-                self.min_order: int = 2 if calc.ref_space.size == 0 else 1
                 self.start_order: int = 0
                 self.final_order: int = 0
                 self.screen: np.ndarray = None
@@ -59,11 +58,20 @@ class ExpCls:
                 self.pi_orbs: np.ndarray = None
                 self.pi_hashes: np.ndarray = None
 
+                # set min_order
+                if calc.base['method'] in ['ccsd', 'ccsd(t)', 'ccsdt']:
+                    valid_order = 4 - min(2, calc.ref_space[calc.ref_space < mol.nocc].size) - min(2, calc.ref_space[mol.nocc <= calc.ref_space].size)
+                elif calc.base['method'] == 'ccsdtq':
+                    valid_order = 6 - min(3, calc.ref_space[calc.ref_space < mol.nocc].size) - min(3, calc.ref_space[mol.nocc <= calc.ref_space].size)
+                else:
+                    valid_order = 2 - calc.ref_space.size
+                self.min_order: int = max(1, valid_order)
+
                 # set max_order
                 if calc.misc['order'] is not None:
-                    self.max_order = min(self.exp_space[0].size, calc.misc['order'])
+                    self.max_order: int = min(self.exp_space[0].size, calc.misc['order'])
                 else:
-                    self.max_order = self.exp_space[0].size
+                    self.max_order: int = self.exp_space[0].size
 
 
 

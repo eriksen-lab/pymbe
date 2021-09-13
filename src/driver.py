@@ -99,7 +99,7 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                 exp.prop[calc.target_mbe]['tot'][-1] += exp.prop[calc.target_mbe]['tot'][-2]
 
             # append determinant statistics
-            if exp.order == exp.start_order and exp.min_order < exp.start_order:
+            if len(exp.mean_ndets) > exp.order - exp.min_order:
                 exp.mean_ndets[-1] = mean_ndets
                 exp.min_ndets[-1] = min_ndets
                 exp.max_ndets[-1] = max_ndets
@@ -109,7 +109,7 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                 exp.max_ndets.append(max_ndets)
 
             # append increment statistics
-            if exp.order == exp.start_order and exp.min_order < exp.start_order:
+            if len(exp.mean_inc) > exp.order - exp.min_order:
                 exp.mean_inc[-1] = mean_inc
                 exp.min_inc[-1] = min_inc
                 exp.max_inc[-1] = max_inc

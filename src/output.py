@@ -160,10 +160,10 @@ def mbe_results(occup: np.ndarray, target: str, root: int, min_order: int, \
         header: str = ''
         if target == 'energy':
             header += 'energy for root {:} (total increment = {:.4e})'. \
-                        format(root, np.asscalar(tot_inc))
+                        format(root, tot_inc.item())
         elif target == 'excitation':
             header += 'excitation energy for root {:} (total increment = {:.4e})'. \
-                        format(root, np.asscalar(tot_inc))
+                        format(root, tot_inc.item())
         elif target == 'dipole':
             header += 'dipole moment for root {:} (total increment = {:.4e})'. \
                         format(root, tot_inc)
@@ -185,7 +185,7 @@ def mbe_results(occup: np.ndarray, target: str, root: int, min_order: int, \
             string += DIVIDER+'\n'
             string += ' RESULT-{:d}:     {:>13.4e}       |        {:>13.4e}         |       {:>13.4e}\n'
 
-            form += (order, order, np.asscalar(mean_inc), np.asscalar(min_inc), np.asscalar(max_inc))
+            form += (order, order, mean_inc.item(), min_inc.item(), max_inc.item())
 
         elif target in ['dipole', 'trans']:
 
@@ -215,7 +215,7 @@ def mbe_results(occup: np.ndarray, target: str, root: int, min_order: int, \
         string += DIVIDER+'\n'
         string += FILL+'\n'
         string += DIVIDER
-        form += (order, order, np.asscalar(mean_ndets), np.asscalar(min_ndets), np.asscalar(max_ndets))
+        form += (order, order, mean_ndets.item(), min_ndets.item(), max_ndets.item())
 
         return string.format(*form)
 
