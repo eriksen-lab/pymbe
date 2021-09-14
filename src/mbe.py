@@ -560,6 +560,9 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         if n_samples == 0:
             return
 
+        # make sure multiple samples are drawn
+        n_samples = max(2, n_samples)
+
         # tuple types describe varying amounts of the orbital types contained in screened_occ, screened_virt, new_exp_occ and new_exp_virt
         # create array for ranges of all tuple types
         ranges = []
@@ -711,7 +714,7 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
             sample_incs = mpi_reduce(mpi.master_comm, sample_incs, op=MPI.SUM)
 
         # print results
-        if mpi.global_master and n_samples > 0:
+        if mpi.global_master:
 
             # calculate sample mean
             sample_mean = fsum(sample_incs) / n_samples
