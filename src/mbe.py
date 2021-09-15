@@ -268,7 +268,7 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
             # calculate increment
             if exp.order > exp.min_order:
                 inc_tup -= _sum(mol.nocc, calc.target_mbe, exp.min_order, exp.order, \
-                                inc, hashes, exp.exp_space, ref_occ, ref_virt, tup)
+                                inc, hashes, ref_occ, ref_virt, tup)
 
             # add hash and increment
             hashes[-1][tup_idx] = hash_1d(tup)
@@ -443,8 +443,8 @@ def _inc(model: Dict[str, Any], base: Union[str, None], orb_type: str, spin: int
 
 
 def _sum(nocc: int, target_mbe: str, min_order: int, order: int, \
-            inc: List[np.ndarray], hashes: List[np.ndarray], exp_space: List[np.ndarray], \
-            ref_occ: bool, ref_virt: bool, tup: np.ndarray) -> Union[float, np.ndarray]:
+         inc: List[np.ndarray], hashes: List[np.ndarray], ref_occ: bool, \
+         ref_virt: bool, tup: np.ndarray) -> Union[float, np.ndarray]:
         """
         this function performs a recursive summation and returns the final increment associated with a given tuple
 
@@ -469,21 +469,21 @@ def _sum(nocc: int, target_mbe: str, min_order: int, order: int, \
         >>> np.random.seed(2)
         >>> inc.append(np.random.rand(36))
         >>> tup = np.array([1, 7, 8])
-        >>> np.isclose(_sum(nocc, 'energy', min_order, tup.size, inc, hashes, exp_space, ref_occ, ref_virt, tup), 1.2177665733781107)
+        >>> np.isclose(_sum(nocc, 'energy', min_order, tup.size, inc, hashes, ref_occ, ref_virt, tup), 1.2177665733781107)
         True
         >>> tup = np.array([1, 7, 8, 9])
-        >>> np.isclose(_sum(nocc, 'excitation', min_order, tup.size, inc, hashes, exp_space, ref_occ, ref_virt, tup), 2.7229882355444195)
+        >>> np.isclose(_sum(nocc, 'excitation', min_order, tup.size, inc, hashes, ref_occ, ref_virt, tup), 2.7229882355444195)
         True
         >>> np.random.seed(1)
         >>> inc.append(np.random.rand(21, 3))
         >>> np.random.seed(2)
         >>> inc.append(np.random.rand(36, 3))
         >>> tup = np.array([1, 7, 8])
-        >>> np.allclose(_sum(nocc, 'dipole', min_order, tup.size, inc, hashes, exp_space, ref_occ, ref_virt, tup),
+        >>> np.allclose(_sum(nocc, 'dipole', min_order, tup.size, inc, hashes, ref_occ, ref_virt, tup),
         ...                 np.array([1.21776657, 1.21776657, 1.21776657]))
         True
         >>> tup = np.array([1, 7, 8, 9])
-        >>> np.allclose(_sum(3, 'trans', min_order, 4, inc, hashes, exp_space, ref_occ, ref_virt, tup),
+        >>> np.allclose(_sum(3, 'trans', min_order, 4, inc, hashes, ref_occ, ref_virt, tup),
         ...                 np.array([2.72298824, 2.72298824, 2.72298824]))
         True
         """

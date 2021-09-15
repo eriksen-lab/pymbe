@@ -213,7 +213,7 @@ def dipole_ints(mol: MolCls, mo: np.ndarray) -> np.ndarray:
 
 
 def e_core_h1e(e_nuc: float, hcore: np.ndarray, vhf: np.ndarray, \
-                core_idx: np.ndarray, cas_idx: np.ndarray) -> Tuple[float, np.ndarray]:
+               core_idx: np.ndarray, cas_idx: np.ndarray) -> Tuple[float, np.ndarray]:
         """
         this function returns core energy and cas space 1e integrals
 
@@ -530,8 +530,8 @@ def _dim(mo_occ: np.ndarray) -> Tuple[int, ...]:
 
 
 def ref_mo(mol: MolCls, mo_coeff: np.ndarray, occup: np.ndarray, orbsym: np.ndarray, \
-            orbs: Dict[str, str], ref: Dict[str, Any], model: Dict[str, str], pi_prune: bool, \
-            hf: scf.RHF) -> Tuple[np.ndarray, Tuple[int, int], np.ndarray]:
+           orbs: Dict[str, str], ref: Dict[str, Any], model: Dict[str, str], \
+           hf: scf.RHF) -> Tuple[np.ndarray, Tuple[int, int], np.ndarray]:
         """
         this function returns a set of reference mo coefficients and symmetries plus the associated spaces
 
@@ -551,7 +551,7 @@ def ref_mo(mol: MolCls, mo_coeff: np.ndarray, occup: np.ndarray, orbsym: np.ndar
         ...        'wfnsym': ['Ag'], 'weights': [1.]}
         >>> orbs = {'type': 'can'}
         >>> mo_coeff_casci, act_n_elec, ref_space = ref_mo(mol, hf.mo_coeff, hf.mo_occ, orbsym,
-        ...                                                     orbs, ref, model, False, hf)
+        ...                                                     orbs, ref, model, hf)
         >>> np.allclose(hf.mo_coeff, mo_coeff_casci)
         True
         >>> act_n_elec
@@ -559,13 +559,13 @@ def ref_mo(mol: MolCls, mo_coeff: np.ndarray, occup: np.ndarray, orbsym: np.ndar
         >>> np.allclose(ref_space, np.array([2, 3, 4, 5], dtype=np.int64))
         True
         >>> orbs['type'] = 'ccsd'
-        >>> mo_coeff_ccsd = ref_mo(mol, hf.mo_coeff, hf.mo_occ, orbsym, orbs, ref, model, False, hf)[0]
+        >>> mo_coeff_ccsd = ref_mo(mol, hf.mo_coeff, hf.mo_occ, orbsym, orbs, ref, model, hf)[0]
         >>> np.allclose(hf.mo_coeff, mo_coeff_ccsd)
         False
         >>> np.allclose(hf_rdm1, scf.hf.make_rdm1(mo_coeff_ccsd, hf.mo_occ))
         True
         >>> orbs['type'] = 'local'
-        >>> mo_coeff_local = ref_mo(mol, hf.mo_coeff, hf.mo_occ, orbsym, orbs, ref, model, False, hf)[0]
+        >>> mo_coeff_local = ref_mo(mol, hf.mo_coeff, hf.mo_occ, orbsym, orbs, ref, model, hf)[0]
         >>> np.allclose(hf.mo_coeff, mo_coeff_local)
         False
         >>> np.allclose(hf_rdm1, scf.hf.make_rdm1(mo_coeff_local, hf.mo_occ))
@@ -573,7 +573,7 @@ def ref_mo(mol: MolCls, mo_coeff: np.ndarray, occup: np.ndarray, orbsym: np.ndar
         >>> orbs['type'] = 'can'
         >>> ref['method'] = 'casscf'
         >>> ref['select'] = [4, 5, 7, 8]
-        >>> mo_coeff_casscf = ref_mo(mol, hf.mo_coeff, hf.mo_occ, orbsym, orbs, ref, model, False, hf)[0]
+        >>> mo_coeff_casscf = ref_mo(mol, hf.mo_coeff, hf.mo_occ, orbsym, orbs, ref, model, hf)[0]
         >>> np.allclose(hf.mo_coeff, mo_coeff_casscf)
         False
         >>> np.allclose(hf_rdm1, scf.hf.make_rdm1(mo_coeff_casscf, hf.mo_occ))
@@ -794,12 +794,13 @@ def ref_prop(mol: MolCls, occup: np.ndarray, target_mbe: str, \
         return ref
 
 
-def main(method: str, cc_backend: str, solver: str, orb_type: str, spin: int, occup: np.ndarray, \
-            target_mbe: str, state_wfnsym: str, point_group: str, orbsym: np.ndarray, \
-            hf_guess: bool, state_root: int, e_hf: float, e_core: float, h1e: np.ndarray, \
-            h2e: np.ndarray, core_idx: np.ndarray, cas_idx: np.ndarray, \
-            n_elec: Tuple[int, int], debug: int, dipole_ints: Union[np.ndarray, None], \
-            dipole_hf: Union[np.ndarray, None], higher_amp_extrap: bool = False) -> Tuple[Union[float, np.ndarray], int]:
+def main(method: str, cc_backend: str, solver: str, orb_type: str, spin: int, \
+         occup: np.ndarray, target_mbe: str, state_wfnsym: str, point_group: str, \
+         orbsym: np.ndarray, hf_guess: bool, state_root: int, e_hf: float, \
+         e_core: float, h1e: np.ndarray, h2e: np.ndarray, core_idx: np.ndarray, \
+         cas_idx: np.ndarray, n_elec: Tuple[int, int], debug: int, \
+         dipole_ints: Union[np.ndarray, None], dipole_hf: Union[np.ndarray, None], \
+         higher_amp_extrap: bool = False) -> Tuple[Union[float, np.ndarray], int]:
         """
         this function return the result property from a given method
 
@@ -895,7 +896,7 @@ def main(method: str, cc_backend: str, solver: str, orb_type: str, spin: int, oc
 
 
 def _dipole(dipole_ints: np.ndarray, occup: np.ndarray, hf_dipole: np.ndarray, \
-                cas_idx: np.ndarray, cas_rdm1: np.ndarray, trans: bool = False) -> np.ndarray:
+            cas_idx: np.ndarray, cas_rdm1: np.ndarray, trans: bool = False) -> np.ndarray:
         """
         this function returns an electronic (transition) dipole moment
 
@@ -931,7 +932,8 @@ def _dipole(dipole_ints: np.ndarray, occup: np.ndarray, hf_dipole: np.ndarray, \
 
 
 def _trans(dipole_ints: np.ndarray, occup: np.ndarray, hf_dipole: np.ndarray, \
-            cas_idx: np.ndarray, cas_rdm1: np.ndarray, hf_weight_gs: float, hf_weight_ex: float) -> np.ndarray:
+           cas_idx: np.ndarray, cas_rdm1: np.ndarray, hf_weight_gs: float, \
+           hf_weight_ex: float) -> np.ndarray:
         """
         this function returns an electronic transition dipole moment
 
@@ -1230,10 +1232,9 @@ def _casscf(mol: MolCls, solver: str, wfnsym: List[str], \
 
 
 def _fci(solver_type: str, spin: int, target_mbe: str, wfnsym: str, orbsym: np.ndarray, \
-            hf_guess: bool, root: int, e_hf: float, e_core: float, \
-            h1e: np.ndarray, h2e: np.ndarray, occup: np.ndarray, \
-            core_idx: np.ndarray, cas_idx: np.ndarray, \
-            n_elec: Tuple[int, int], debug: int) -> Dict[str, Any]:
+         hf_guess: bool, root: int, e_hf: float, e_core: float, h1e: np.ndarray, \
+         h2e: np.ndarray, occup: np.ndarray, core_idx: np.ndarray, \
+         cas_idx: np.ndarray, n_elec: Tuple[int, int], debug: int) -> Dict[str, Any]:
         """
         this function returns the results of a fci calculation
 
@@ -1374,10 +1375,10 @@ def _fci(solver_type: str, spin: int, target_mbe: str, wfnsym: str, orbsym: np.n
 
 
 def _cc(spin: int, occup: np.ndarray, core_idx: np.ndarray, cas_idx: np.ndarray, method: str, \
-            cc_backend: str = 'pyscf', n_elec: Tuple[int, int] = None, orb_type: str = None, \
-            point_group: str = None, orbsym: np.ndarray = None, h1e: np.ndarray = None, \
-            h2e: np.ndarray = None, hf: scf.RHF = None, higher_amp_extrap: bool = True, \
-            rdm1: bool = False, debug: int = 0) -> Dict[str, Any]:
+        cc_backend: str = 'pyscf', n_elec: Tuple[int, int] = None, orb_type: str = None, \
+        point_group: str = None, orbsym: np.ndarray = None, h1e: np.ndarray = None, \
+        h2e: np.ndarray = None, hf: scf.RHF = None, higher_amp_extrap: bool = True, \
+        rdm1: bool = False, debug: int = 0) -> Dict[str, Any]:
         """
         this function returns the results of a ccsd / ccsd(t) calculation
 

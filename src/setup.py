@@ -152,8 +152,7 @@ def _exp(mpi: MPICls, mol: MolCls, calc: CalcCls) -> Tuple[MolCls, CalcCls, ExpC
 
                 # reference and expansion spaces and mo coefficients
                 calc.mo_coeff, calc.nelec, calc.ref_space = ref_mo(mol, calc.mo_coeff, calc.occup, calc.orbsym, \
-                                                                   calc.orbs, calc.ref, calc.model, \
-                                                                   calc.extra['pi_prune'], calc.hf)
+                                                                   calc.orbs, calc.ref, calc.model, calc.hf)
 
         # bcast fundamental info
         mol, calc = fund_dist(mpi, mol, calc)
@@ -251,6 +250,8 @@ def restart_main(mpi: MPICls, calc: CalcCls, exp: ExpCls) -> int:
                         exp.n_tuples['theo'].append(np.load(os.path.join(RST, files[i])).tolist())
                     if 'inc' in files[i]:
                         exp.n_tuples['inc'].append(np.load(os.path.join(RST, files[i])).tolist())
+                    if 'calc' in files[i]:
+                        exp.n_tuples['calc'].append(np.load(os.path.join(RST, files[i])).tolist())
             mpi.global_comm.bcast(exp.n_tuples, root=0)
         else:
             exp.n_tuples = mpi.global_comm.bcast(None, root=0)

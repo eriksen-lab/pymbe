@@ -122,24 +122,24 @@ def mbe_status(order: int, prog: float) -> str:
             format(order, '#' * status + '-' * remainder, prog * 100.)
 
 
-def mbe_end(order: int, time: float, n_tuples: int) -> str:
+def mbe_end(order: int, time: float) -> str:
         """
         this function prints the end mbe information
         """
         # set string
         string: str = DIVIDER+'\n'
-        string += ' STATUS-{:d}:  order k = {:d} MBE done in {:s}  ---  {:d} tuples retained\n'
+        string += ' STATUS-{:d}:  order k = {:d} MBE done in {:s}\n'
         string += DIVIDER
 
-        form: Tuple[Any, ...] = (order, order, time_str(time), n_tuples,)
+        form: Tuple[Any, ...] = (order, order, time_str(time),)
 
         return string.format(*form)
 
 
-def mbe_results(occup: np.ndarray, target: str, root: int, min_order: int, \
-                order: int, prop_tot: List[Union[float, np.ndarray]], \
-                mean_inc: np.ndarray, min_inc: np.ndarray, max_inc: np.ndarray, \
-                mean_ndets: np.ndarray, min_ndets: np.ndarray, max_ndets: np.ndarray) -> str:
+def mbe_results(target: str, root: int, min_order: int, order: int, \
+                prop_tot: List[np.ndarray], mean_inc: np.ndarray, \
+                min_inc: np.ndarray, max_inc: np.ndarray, mean_ndets: np.ndarray, \
+                min_ndets: np.ndarray, max_ndets: np.ndarray) -> str:
         """
         this function prints mbe results statistics
         """
@@ -147,9 +147,9 @@ def mbe_results(occup: np.ndarray, target: str, root: int, min_order: int, \
         tot_inc: float = 0.
         if target in ['energy', 'excitation']:
             if order == min_order:
-                tot_inc += prop_tot[order-min_order]
+                tot_inc += prop_tot[order-min_order].item()
             else:
-                tot_inc += prop_tot[order-min_order] - prop_tot[order-min_order-1]
+                tot_inc += (prop_tot[order-min_order] - prop_tot[order-min_order-1]).item()
         elif target in ['dipole', 'trans']:
             if order == min_order:
                 tot_inc += np.linalg.norm(prop_tot[order-min_order])
@@ -160,10 +160,10 @@ def mbe_results(occup: np.ndarray, target: str, root: int, min_order: int, \
         header: str = ''
         if target == 'energy':
             header += 'energy for root {:} (total increment = {:.4e})'. \
-                        format(root, tot_inc.item())
+                        format(root, tot_inc)
         elif target == 'excitation':
             header += 'excitation energy for root {:} (total increment = {:.4e})'. \
-                        format(root, tot_inc.item())
+                        format(root, tot_inc)
         elif target == 'dipole':
             header += 'dipole moment for root {:} (total increment = {:.4e})'. \
                         format(root, tot_inc)

@@ -54,7 +54,7 @@ class ExpCls:
                 self.screen: np.ndarray = None
                 self.screen_orbs: np.ndarray = None
                 self.exp_space: List[np.ndarray] = [np.array([i for i in range(mol.ncore, mol.norb) if i not in calc.ref_space], dtype=np.int64)]
-                self.n_tuples: Dict[str, List[int]] = {'theo': [], 'inc': []}
+                self.n_tuples: Dict[str, List[int]] = {'theo': [], 'calc': [], 'inc': []}
                 self.pi_orbs: np.ndarray = None
                 self.pi_hashes: np.ndarray = None
 
@@ -69,9 +69,10 @@ class ExpCls:
 
                 # set max_order
                 if calc.misc['order'] is not None:
-                    self.max_order: int = min(self.exp_space[0].size, calc.misc['order'])
+                    max_order = min(self.exp_space[0].size, calc.misc['order'])
                 else:
-                    self.max_order: int = self.exp_space[0].size
+                    max_order = self.exp_space[0].size
+                self.max_order: int = max_order
 
 
 

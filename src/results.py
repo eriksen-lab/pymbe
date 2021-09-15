@@ -494,9 +494,9 @@ def _timings_prt(calc: CalcCls, exp: ExpCls) -> str:
         string += DIVIDER[:112]+'\n'
 
         for i, j in enumerate(range(exp.min_order, exp.final_order+1)):
-            calc_i = exp.n_tuples['inc'][i]
-            rel_i = exp.n_tuples['inc'][i] / exp.n_tuples['theo'][i] * 100.
-            calc_tot = sum(exp.n_tuples['inc'][:i+1])
+            calc_i = exp.n_tuples['calc'][i]
+            rel_i = exp.n_tuples['calc'][i] / exp.n_tuples['theo'][i] * 100.
+            calc_tot = sum(exp.n_tuples['calc'][:i+1])
             rel_tot = calc_tot / sum(exp.n_tuples['theo'][:i+1]) * 100.
             string += '{:7}{:>4d}{:6}{:1}{:2}{:>15s}{:2}{:1}{:2}{:>15s}{:2}' \
                       '{:1}{:2}{:>15s}{:2}{:1}{:5}{:>10d}{:5}{:1}{:4}{:6.2f}\n'

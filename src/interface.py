@@ -31,8 +31,9 @@ except ImportError:
 MAX_MEM = 131071906
 CONV_TOL = 10
 
-def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: str, orbsym: np.ndarray, \
-                    h1e: np.ndarray, h2e: np.ndarray, n_elec: Tuple[int, int], higher_amp_extrap: bool, \
+def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: str, \
+                    orbsym: np.ndarray, h1e: np.ndarray, h2e: np.ndarray, \
+                    n_elec: Tuple[int, int], higher_amp_extrap: bool, \
                     debug: int) -> Tuple[float, int]:
         """
         this function returns the results of a cc calculation using the mbecc
