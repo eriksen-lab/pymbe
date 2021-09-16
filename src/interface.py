@@ -78,7 +78,6 @@ def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: st
         # settings
         method_val = ctypes.c_int64(method_dict[method])
         cc_module_val = ctypes.c_int64(cc_module_dict[cc_backend])
-        n_elec_arr = np.array(n_elec)
         point_group_val = ctypes.c_int64(point_group_dict[point_group])
         non_canonical = ctypes.c_int64(0 if orb_type == 'can' else 1)
         maxcor = ctypes.c_int64(MAX_MEM) # max memory in integer words
@@ -92,7 +91,7 @@ def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: st
         h2e = ao2mo.restore(1, h2e, n_act)
 
         # initialize variables
-        n_elec = np.array(n_elec, dtype=np.int64) # number of occupied orbitals
+        n_elec_arr = np.array(n_elec, dtype=np.int64) # number of occupied orbitals
         n_act = ctypes.c_int64(n_act) # number of orbitals
         cc_energy = ctypes.c_double() # cc-energy output
         success = ctypes.c_int64() # success flag
