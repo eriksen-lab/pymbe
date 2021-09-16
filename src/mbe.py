@@ -697,14 +697,14 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
 
             # calculate increment
             sample_incs[tup_idx], _, _ = _inc(calc.model, calc.base['method'], calc.orbs['type'], mol.spin, \
-                                                  calc.occup, calc.target_mbe, calc.state, mol.groupname, \
-                                                  calc.orbsym, calc.prop, e_core, h1e_cas, h2e_cas, \
-                                                  core_idx, cas_idx, mol.debug, mol.dipole_ints)
+                                              calc.occup, calc.target_mbe, calc.state, mol.groupname, \
+                                              calc.orbsym, calc.prop, e_core, h1e_cas, h2e_cas, core_idx, \
+                                              cas_idx, mol.debug, mol.dipole_ints)
 
             # calculate increment
             if next_order > exp.min_order:
                 sample_incs[tup_idx] -= _sum(mol.nocc, calc.target_mbe, exp.min_order, next_order, \
-                                inc, hashes, exp.exp_space, ref_occ, ref_virt, tup)
+                                             inc, hashes, ref_occ, ref_virt, tup)
 
         # mpi barrier
         mpi.global_comm.Barrier()
