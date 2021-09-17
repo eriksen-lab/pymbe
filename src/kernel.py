@@ -1050,11 +1050,12 @@ def base(mol: MolCls, orb_type: str, occup: np.ndarray, mo_coeff: np.ndarray, ta
             mol_fullsym = MolCls()
             mol_fullsym.defaults()
 
-            # read input
-            mol_fullsym = set_system(mol_fullsym)
+            # copy atom attribute
+            mol_fullsym.atom = mol.atom
 
-            # translate input
-            mol_fullsym = translate_system(mol_fullsym)
+            # copy system attributes
+            for key, val in mol.system.items():
+                setattr(mol_fullsym, key, val)
 
             # use symmetry
             mol_fullsym.symmetry = True

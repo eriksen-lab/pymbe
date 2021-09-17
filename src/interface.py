@@ -108,6 +108,23 @@ def mbecc_interface(method: str, cc_backend: str, orb_type: str, point_group: st
                            ctypes.byref(t4_extrapol), ctypes.byref(verbose), \
                            ctypes.byref(cc_energy), ctypes.byref(success))
 
+        # convergence check
+        if success.value != 1:
+
+            # redo calculation in debug mode if not converged
+            verbose = ctypes.c_int64(1)
+
+            cclib.cc_interface(ctypes.byref(method_val), ctypes.byref(cc_module_val), \
+                               ctypes.byref(non_canonical), ctypes.byref(maxcor), \
+                               n_elec_arr.ctypes.data_as(ctypes.c_void_p), \
+                               ctypes.byref(n_act), orbsym.ctypes.data_as(ctypes.c_void_p), \
+                               ctypes.byref(point_group_val), \
+                               h1e.ctypes.data_as(ctypes.c_void_p), \
+                               h2e.ctypes.data_as(ctypes.c_void_p), ctypes.byref(conv), \
+                               ctypes.byref(max_cycle), ctypes.byref(t3_extrapol), \
+                               ctypes.byref(t4_extrapol), ctypes.byref(verbose), \
+                               ctypes.byref(cc_energy), ctypes.byref(success))
+
         return cc_energy.value, success.value
 
 if __name__ == "__main__":
