@@ -653,6 +653,11 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
             if tup_idx % mpi.global_size != mpi.global_rank:
                 continue
 
+            # pi-pruning
+            if calc.extra['pi_prune']:
+                if not pi_prune(exp.pi_orbs, exp.pi_hashes, tup):
+                    continue
+
             # check if index is in range of another tuple type
             while index >= ranges[range_index]:
 
