@@ -39,9 +39,8 @@ SEED = 50
 seed(SEED)
 
 def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
-            rst_read: bool = False, tup_idx: int = 0, \
-            tup: Union[np.ndarray, None] = None, \
-            rst_write: bool = False) -> Tuple[Any, ...]:
+         rst_read: bool = False, tup_idx: int = 0, \
+         tup: Union[np.ndarray, None] = None) -> Tuple[Any, ...]:
         """
         this function is the mbe main function
         """
@@ -367,8 +366,9 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
 
         # write restart files
         if mpi.global_master:
-            write_file(exp.order, tot_screen, 'mbe_screen')
-            write_file(exp.order+1, exp.exp_space[-1], 'exp_space')
+            if calc.misc['rst']:
+                write_file(exp.order, tot_screen, 'mbe_screen')
+                write_file(exp.order+1, exp.exp_space[-1], 'exp_space')
 
         # total property
         tot = mean_inc * exp.n_tuples['inc'][-1]

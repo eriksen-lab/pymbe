@@ -39,7 +39,7 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
 
                 # print mbe header
                 print(mbe_header(i, exp.n_tuples['calc'][i-exp.min_order], \
-                                 1. if (i-exp.min_order) < calc.thres['start'] else calc.thres['perc']))
+                                 1. if i < calc.thres['start'] else calc.thres['perc']))
 
                 # print mbe end
                 print(mbe_end(i, exp.time['mbe'][i-exp.min_order]))
@@ -70,9 +70,10 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                                                     occ_prune(calc.occup, calc.ref_space), \
                                                     virt_prune(calc.occup, calc.ref_space), exp.order))
                 exp.n_tuples['inc'].append(exp.n_tuples['calc'][-1])
-                write_file(exp.order, np.asarray(exp.n_tuples['theo'][-1]), 'mbe_n_tuples_theo')
-                write_file(exp.order, np.asarray(exp.n_tuples['calc'][-1]), 'mbe_n_tuples_calc')
-                write_file(exp.order, np.asarray(exp.n_tuples['inc'][-1]), 'mbe_n_tuples_inc')
+                if calc.misc['rst']:
+                    write_file(exp.order, np.asarray(exp.n_tuples['theo'][-1]), 'mbe_n_tuples_theo')
+                    write_file(exp.order, np.asarray(exp.n_tuples['calc'][-1]), 'mbe_n_tuples_calc')
+                    write_file(exp.order, np.asarray(exp.n_tuples['inc'][-1]), 'mbe_n_tuples_inc')
 
             # print mbe header
             print(mbe_header(exp.order, exp.n_tuples['calc'][-1], \
@@ -268,6 +269,6 @@ def slave(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                 slave = False
 
         # finalize mpi
-        mpi_finalize(mpi)
+        mpi_finalize(mpi, calc.misc['rst'])
 
 

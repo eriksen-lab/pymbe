@@ -109,7 +109,8 @@ def _calc(mpi: MPICls, mol: MolCls) -> CalcCls:
 
             # restart folder and logical
             if not os.path.isdir(RST):
-                os.mkdir(RST)
+                if calc.misc['rst']:
+                    os.mkdir(RST)
                 calc.restart = False
             else:
                 calc.restart = True

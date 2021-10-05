@@ -55,7 +55,7 @@ def main():
             results_main(mpi, mol, calc, exp)
 
             # finalize mpi
-            mpi_finalize(mpi)
+            mpi_finalize(mpi, calc.misc['rst'])
 
         else:
 

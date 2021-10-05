@@ -298,13 +298,14 @@ def mpi_gatherv(comm: MPI.Comm, send_buff: np.ndarray, recv_buff: np.ndarray, \
         return recv_buff
 
 
-def mpi_finalize(mpi: MPICls) -> None:
+def mpi_finalize(mpi: MPICls, rst_write: bool) -> None:
         """
         this function terminates a successful pymbe calculation
         """
         # wake up slaves
         if mpi.global_master:
-            shutil.rmtree(RST)
+            if rst_write:
+                shutil.rmtree(RST)
             mpi.global_comm.bcast({'task': 'exit'}, root=0)
 
         # finalize
