@@ -17,6 +17,7 @@ import numpy as np
 from mpi4py import MPI
 from pyscf import gto
 from typing import Tuple, Set, List, Dict, Union, Any
+from bisect import bisect
 
 from random import seed, sample
 import scipy.special as sc
@@ -626,9 +627,6 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         # draw random sample from total number of screened_orbitals
         random_sample = sample(range(n_screened), n_samples)
 
-        # sort random sample
-        random_sample.sort()
-
         # create increment array
         sample_incs_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
         buf = sample_incs_win.Shared_query(0)[0] # type: ignore
@@ -636,15 +634,9 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         if mpi.local_master and not mpi.global_master:
             sample_incs.fill(0.)
 
-        # start within first range
-        range_index = 0
-
         # print header
         if mpi.global_master:
             print(error_est_header(exp.order, n_samples))
-
-        # start without a shift until second range is reached
-        shift = 0
 
         # loop over sorted indices in sample
         for tup_idx, index in enumerate(random_sample):
@@ -653,11 +645,11 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
             if tup_idx % mpi.global_size != mpi.global_rank:
                 continue
 
-            # check if index is in range of another tuple type
-            while index >= ranges[range_index]:
+            # get tuple type range of index
+            range_index = bisect(ranges, index)
 
-                shift = ranges[range_index]
-                range_index += 1
+            # set shift
+            shift = ranges[range_index]
 
             # calculate index independent of tuple type
             index_diff = index - shift
