@@ -562,6 +562,10 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         # make sure multiple samples are drawn
         n_samples = max(2, n_samples)
 
+        # print header
+        if mpi.global_master:
+            print(error_est_header(exp.order, n_samples))
+
         # tuple types describe varying amounts of the orbital types contained in screened_occ, screened_virt, new_exp_occ and new_exp_virt
         # create array for ranges of all tuple types
         ranges = []
@@ -627,8 +631,8 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         buf = random_sample_win.Shared_query(0)[0] # type: ignore
         random_sample = np.ndarray(buffer=buf, dtype=np.float64, shape=n_samples)
         if mpi.local_master:
-            np.random.seed(SEED)
-            random_sample[:] = np.random.choice(n_screened, size=n_samples, replace=False)
+            rng = np.random.default_rng(SEED)
+            random_sample[:] = rng.choice(n_screened, size=n_samples, replace=False)
 
         # create increment array
         sample_incs_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
@@ -636,10 +640,6 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         sample_incs = np.ndarray(buffer=buf, dtype=np.float64, shape=(n_samples,))
         if mpi.local_master and not mpi.global_master:
             sample_incs.fill(0.)
-
-        # print header
-        if mpi.global_master:
-            print(error_est_header(exp.order, n_samples))
 
         # loop over sorted indices in sample
         for tup_idx, index in enumerate(np.nditer(random_sample)):
