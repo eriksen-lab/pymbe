@@ -19,7 +19,6 @@ from pyscf import gto
 from typing import Tuple, Set, List, Dict, Union, Any
 from bisect import bisect
 
-from random import seed, sample
 import scipy.special as sc
 
 from kernel import e_core_h1e, hubbard_h1e, hubbard_eri, main as kernel_main
@@ -36,7 +35,6 @@ SCREEN = 1000. # random, non-sensical number
 
 # seed for random processes
 SEED = 50
-seed(SEED)
 
 def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
          rst_read: bool = False, tup_idx: int = 0, \
@@ -624,8 +622,13 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         # create tuple array
         tup = np.empty(next_order, dtype=int)
 
-        # draw random sample from total number of screened_orbitals
-        random_sample = sample(range(n_screened), n_samples)
+        # create random sample array
+        random_sample_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
+        buf = random_sample_win.Shared_query(0)[0] # type: ignore
+        random_sample = np.ndarray(buffer=buf, dtype=np.float64, shape=n_samples)
+        if mpi.local_master:
+            np.random.seed(SEED)
+            random_sample[:] = np.random.choice(n_screened, size=n_samples, replace=False)
 
         # create increment array
         sample_incs_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
@@ -639,7 +642,7 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
             print(error_est_header(exp.order, n_samples))
 
         # loop over sorted indices in sample
-        for tup_idx, index in enumerate(random_sample):
+        for tup_idx, index in enumerate(np.nditer(random_sample)):
 
             # distribute tuples
             if tup_idx % mpi.global_size != mpi.global_rank:
