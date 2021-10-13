@@ -24,6 +24,7 @@ from calculation import CalcCls
 from expansion import ExpCls
 from parallel import MPICls, mpi_finalize
 from tools import n_tuples, occ_prune, virt_prune, inc_dim, inc_shape, write_file
+from ml import train
 
 
 def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
@@ -128,6 +129,10 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                               exp.order, exp.prop[calc.target_mbe]['tot'], \
                               exp.mean_inc[-1], exp.min_inc[-1], exp.max_inc[-1], \
                               exp.mean_ndets[-1], exp.min_ndets[-1], exp.max_ndets[-1]))
+
+            # train ml model
+            if (exp.order == calc.thres['start']):
+                model = train(mol, calc, exp)
 
             # update screen_orbs
             if exp.order == exp.min_order:
