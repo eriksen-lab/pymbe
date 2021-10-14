@@ -491,7 +491,7 @@ def _pi_orbs(pi_space: np.ndarray, tup: np.ndarray) -> np.ndarray:
         >>> _pi_orbs(np.array([1, 2, 4, 5], dtype=np.int64), np.arange(8, dtype=np.int64))
         array([1, 2, 4, 5])
         """
-        return tup[np.in1d(tup, pi_space)]
+        return np.intersect1d(tup, pi_space, assume_unique=True)
 
 
 def pi_prune(pi_space: np.ndarray, pi_hashes: np.ndarray, tup: np.ndarray) -> bool:
