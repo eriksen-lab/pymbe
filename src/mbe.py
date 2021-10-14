@@ -16,10 +16,10 @@ import sys
 import numpy as np
 from mpi4py import MPI
 from pyscf import gto
-from typing import Tuple, Set, List, Dict, Union, Any
-from bisect import bisect
-
+from typing import Tuple, Set, List, Dict, Union, Any, Generator
+from itertools import islice, combinations
 import scipy.special as sc
+from bisect import bisect
 
 from kernel import e_core_h1e, hubbard_h1e, hubbard_eri, main as kernel_main
 from output import mbe_status, mbe_debug, error_est_header, error_est_results, DIVIDER
@@ -539,18 +539,26 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         screened_occ = np.setdiff1d(old_exp_occ, new_exp_occ)
         screened_virt = np.setdiff1d(old_exp_virt, new_exp_virt)
 
-        # calculate number of tuples at next order if no screening happened at this order
-        n_theo = n_tuples(old_exp_occ, old_exp_virt, \
-                          occ_prune(calc.occup, calc.ref_space), \
-                          virt_prune(calc.occup, calc.ref_space), next_order)
+        ref_occ = occ_prune(calc.occup, calc.ref_space)
+        ref_virt = virt_prune(calc.occup, calc.ref_space)
 
-        # calculate number of tuples at next order with screening at this order
-        n_actual = n_tuples(new_exp_occ, new_exp_virt, \
-                            occ_prune(calc.occup, calc.ref_space), \
-                            virt_prune(calc.occup, calc.ref_space), next_order)
+        if calc.extra['pi_prune']:
 
-        # calculate number of tuples that are screened away at next order due to screening at this order
-        n_screened = n_theo - n_actual
+            # calculate number of tuples that are allowed under pruning wrt degenerate pi-orbitals and are screened away at next order due to screening at this order
+            n_screened = sum(1 for _ in screened_tuples(screened_occ, screened_virt, new_exp_occ, new_exp_virt, ref_occ, ref_virt, next_order, exp.pi_orbs, exp.pi_hashes))
+
+        else:
+
+            # calculate number of tuples at next order if no screening happened at this order
+            n_theo = n_tuples(old_exp_occ, old_exp_virt, ref_occ, ref_virt, \
+                              next_order)
+
+            # calculate number of tuples at next order with screening at this order
+            n_actual = n_tuples(new_exp_occ, new_exp_virt, ref_occ, ref_virt, \
+                                next_order)
+
+            # calculate number of tuples that are screened away at next order due to screening at this order
+            n_screened = n_theo - n_actual
 
         # define number of samples to draw from screened orbitals
         n_samples = int(min(round(0.1 * n_screened), 1e6))
@@ -566,73 +574,108 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
         if mpi.global_master:
             print(error_est_header(exp.order, n_samples))
 
-        # tuple types describe varying amounts of the orbital types contained in screened_occ, screened_virt, new_exp_occ and new_exp_virt
-        # create array for ranges of all tuple types
-        ranges = []
+        # seed the random number generator
+        if mpi.local_master:
+            rng = np.random.default_rng(SEED)
 
-        # create array for number of orbital types in each tuple type
-        k_orb_type = []
+        if calc.extra['pi_prune']:
 
-        n_total = 0
+            # create random sample array
+            random_sample_win = MPI.Win.Allocate_shared(8 * n_samples * next_order if mpi.local_master else 0, 8, comm=mpi.local_comm)
+            buf = random_sample_win.Shared_query(0)[0] # type: ignore
+            random_sample = np.ndarray(buffer=buf, dtype=np.int64, shape=(n_samples, next_order))
+
+            if mpi.local_master:
+
+                # generator for screened tuples
+                gen = screened_tuples(screened_occ, screened_virt, new_exp_occ, new_exp_virt, ref_occ, ref_virt, next_order, exp.pi_orbs, exp.pi_hashes)
         
-        # loop over number of screened orbitals in tuple, at least one screened orbital has to be present for a tuple to be screened out
-        for screened_orbs in range(1, next_order + 1):
+                # fill sample
+                for i, tup in enumerate(islice(gen, n_samples)): 
+                    
+                    random_sample[i] = tup
 
-            # loop over number of screened occupied orbitals in tuple
-            for k in range(0, screened_orbs + 1):
+                # shuffle sample
+                rng.shuffle(random_sample)
 
-                # loop over number of unscreened occupied orbitals in this tuple, k + l must be at least 1 and at most next_order - screened_orbs - 1 if ref_virt or ref_occ are not True
-                for l in range(0 if k > 0 else 1, next_order - screened_orbs + 1 if k < screened_orbs else next_order - screened_orbs):
+                for i, tup in enumerate(gen, start=n_samples+1):
+
+                    # generate random number between 0 and i
+                    j = rng.integers(i)
+
+                    # replace item with gradually decreasing probability
+                    if j < n_samples:
+
+                        random_sample[j] = tup
+
+        else:
+
+            # tuple types describe varying amounts of the orbital types contained in screened_occ, screened_virt, new_exp_occ and new_exp_virt
+            # create array for ranges of all tuple types
+            ranges = []
+
+            # create array for number of orbital types in each tuple type
+            k_orb_type = []
+
+            n_total = 0
+
+            # loop over number of screened orbitals in tuple, at least one screened orbital has to be present for a tuple to be screened out
+            for screened_orbs in range(1, next_order + 1):
+
+                # loop over number of screened occupied orbitals in tuple
+                for k in range(0, screened_orbs + 1):
+
+                    # loop over number of unscreened occupied orbitals in this tuple, k + l must be at least 1 and at most next_order - screened_orbs - 1 if ref_virt or ref_occ are not True
+                    for l in range(0 if k > 0 else 1, next_order - screened_orbs + 1 if k < screened_orbs else next_order - screened_orbs):
+
+                        # calculate number of possible combinations for this tuple type
+                        n_comb = int(sc.binom(screened_occ.size, k) * sc.binom(screened_virt.size, screened_orbs - k) * sc.binom(new_exp_occ.size, l) * sc.binom(new_exp_virt.size, next_order - screened_orbs - l))
+
+                        # add range and number of orbital types if this tuple type has valid combinations
+                        if n_comb > 0:
+                            
+                            n_total += n_comb
+                            ranges.append(n_total)
+                            k_orb_type.append([k, l, screened_orbs - k, next_order - screened_orbs - l])
+
+                # consider all occupied tuples if reference space includes virtual orbitals
+                if ref_virt:
 
                     # calculate number of possible combinations for this tuple type
-                    n_comb = int(sc.binom(screened_occ.size, k) * sc.binom(screened_virt.size, screened_orbs - k) * sc.binom(new_exp_occ.size, l) * sc.binom(new_exp_virt.size, next_order - screened_orbs - l))
+                    n_comb = int(sc.binom(screened_occ.size, screened_orbs) * sc.binom(new_exp_occ.size, next_order - screened_orbs))
 
                     # add range and number of orbital types if this tuple type has valid combinations
                     if n_comb > 0:
-                        
+
                         n_total += n_comb
                         ranges.append(n_total)
-                        k_orb_type.append([k, l, screened_orbs - k, next_order - screened_orbs - l])
+                        k_orb_type.append([screened_orbs, next_order - screened_orbs, 0, 0])
 
-            # consider all occupied tuples if reference space includes virtual orbitals
-            if ref_virt:
+                # consider all virtual tuples if reference space includes occupied orbitals
+                if ref_occ:
 
-                # calculate number of possible combinations for this tuple type
-                n_comb = int(sc.binom(screened_occ.size, screened_orbs) * sc.binom(new_exp_occ.size, next_order - screened_orbs))
+                    # calculate number of possible combinations for this tuple type
+                    n_comb = int(sc.binom(screened_virt.size, screened_orbs) * sc.binom(new_exp_virt.size, next_order - screened_orbs))
 
-                # add range and number of orbital types if this tuple type has valid combinations
-                if n_comb > 0:
+                    # add range and number of orbital types if this tuple type has valid combinations
+                    if n_comb > 0:
 
-                    n_total += n_comb
-                    ranges.append(n_total)
-                    k_orb_type.append([screened_orbs, next_order - screened_orbs, 0, 0])
+                        n_total += n_comb
+                        ranges.append(n_total)
+                        k_orb_type.append([0, 0, screened_orbs, next_order - screened_orbs])
 
-            # consider all virtual tuples if reference space includes occupied orbitals
-            if ref_occ:
+            # create list with number of orbitals of the different types
+            n_orb_type = [screened_occ.size, new_exp_occ.size, screened_virt.size, new_exp_virt.size]
 
-                # calculate number of possible combinations for this tuple type
-                n_comb = int(sc.binom(screened_virt.size, screened_orbs) * sc.binom(new_exp_virt.size, next_order - screened_orbs))
+            # create tuple array
+            tup = np.empty(next_order, dtype=int)
 
-                # add range and number of orbital types if this tuple type has valid combinations
-                if n_comb > 0:
-
-                    n_total += n_comb
-                    ranges.append(n_total)
-                    k_orb_type.append([0, 0, screened_orbs, next_order - screened_orbs])
-
-        # create list with number of orbitals of the different types
-        n_orb_type = [screened_occ.size, new_exp_occ.size, screened_virt.size, new_exp_virt.size]
-
-        # create tuple array
-        tup = np.empty(next_order, dtype=int)
-
-        # create random sample array
-        random_sample_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
-        buf = random_sample_win.Shared_query(0)[0] # type: ignore
-        random_sample = np.ndarray(buffer=buf, dtype=np.float64, shape=n_samples)
-        if mpi.local_master:
-            rng = np.random.default_rng(SEED)
-            random_sample[:] = rng.choice(n_screened, size=n_samples, replace=False)
+            # create random sample array
+            random_sample_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
+            buf = random_sample_win.Shared_query(0)[0] # type: ignore
+            random_sample = np.ndarray(buffer=buf, dtype=np.int64, shape=n_samples)
+            if mpi.local_master:
+                random_sample[:] = rng.choice(n_screened, size=n_samples, replace=False)
 
         # create increment array
         sample_incs_win = MPI.Win.Allocate_shared(8 * n_samples if mpi.local_master else 0, 8, comm=mpi.local_comm)
@@ -642,46 +685,52 @@ def _error_est(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, eri: np.nda
             sample_incs.fill(0.)
 
         # loop over sorted indices in sample
-        for tup_idx, index in enumerate(np.nditer(random_sample)):
+        for tup_idx in range(random_sample.shape[0]):
 
             # distribute tuples
             if tup_idx % mpi.global_size != mpi.global_rank:
                 continue
 
-            # get tuple type range of index
-            range_index = bisect(ranges, index)
+            # get tup
+            if calc.extra['pi_prune']:
 
-            # set shift
-            shift = ranges[range_index]
+                # set tup directly
+                tup = random_sample[tup_idx,:]
 
-            # calculate index independent of tuple type
-            index_diff = index - shift
+            else:
 
-            # orbital index in tuple
-            i = 0
+                # set index
+                index = random_sample[tup_idx]
 
-            # loop over orbital types
-            for n_orbs, k_orbs, orb_indices in zip(n_orb_type, k_orb_type[range_index], [screened_occ, new_exp_occ, screened_virt, new_exp_virt]):
+                # get tuple type range of index
+                range_index = bisect(ranges, index)
 
-                # dividing index by number of elements in combination n_orb over k_orb yields the product of all combinations of other orbital types
-                # remainder describes specific k_orbs-sized tuple of orbitals from set n_orbs
-                index_diff, remainder = divmod(index_diff, sc.binom(n_orbs, k_orbs))
+                # set shift
+                shift = ranges[range_index]
 
-                # get specific k_orbs-sized tuple from remainder
-                orbs = _orbs_from_index(remainder, n_orbs, k_orbs)
+                # calculate index independent of tuple type
+                index_diff = index - shift
 
-                # add orbitals to tuple using their actual orbital index
-                tup[i:i+k_orbs] = orb_indices[orbs]
+                # orbital index in tuple
+                i = 0
 
-                i += k_orbs
+                # loop over orbital types
+                for n_orbs, k_orbs, orb_indices in zip(n_orb_type, k_orb_type[range_index], [screened_occ, new_exp_occ, screened_virt, new_exp_virt]):
+
+                    # dividing index by number of elements in combination n_orb over k_orb yields the product of all combinations of other orbital types
+                    # remainder describes specific k_orbs-sized tuple of orbitals from set n_orbs
+                    index_diff, remainder = divmod(index_diff, sc.binom(n_orbs, k_orbs))
+
+                    # get specific k_orbs-sized tuple from remainder
+                    orbs = _orbs_from_index(remainder, n_orbs, k_orbs)
+
+                    # add orbitals to tuple using their actual orbital index
+                    tup[i:i+k_orbs] = orb_indices[orbs]
+
+                    i += k_orbs
 
             # sort tup
             tup.sort()
-
-            # pi-pruning
-            if calc.extra['pi_prune']:
-                if not pi_prune(exp.pi_orbs, exp.pi_hashes, tup):
-                    continue
 
             # get core and cas indices
             core_idx, cas_idx = core_cas(mol.nocc, calc.ref_space, tup)
@@ -758,6 +807,58 @@ def _orbs_from_index(i, n_orbs, k_orbs):
                 orbs[k_orbs] = orb - 1
 
         return orbs
+
+
+def screened_tuples(screen_occ_space: np.ndarray, screen_virt_space: np.ndarray, \
+                    noscreen_occ_space: np.ndarray, noscreen_virt_space: np.ndarray, \
+                    ref_occ: bool, ref_virt: bool, order: int, pi_space: np.ndarray, \
+                    pi_hashes: np.ndarray) -> Generator[np.ndarray, None, None]:
+        """
+        this function is the main generator for screened tuples that are allowed under pruning wrt degenerate pi-orbitals
+        """
+        # loop over number of screened orbitals in tuple, at least one screened orbital has to be present for a tuple to be screened out
+        for screened_orbs in range(1, order + 1):
+
+            # loop over number of screened occupied orbitals in tuple
+            for k in range(0, screened_orbs + 1):
+
+                # loop over number of unscreened occupied orbitals in this tuple, k + l must be at least 1 and at most next_order - screened_orbs - 1 if ref_virt or ref_occ are not True
+                for l in range(0 if k > 0 else 1, order - screened_orbs + 1 if k < screened_orbs else order - screened_orbs):
+                    
+                    for tup_screen_occ in islice(combinations(screen_occ_space, k), None):
+                        for tup_screen_virt in islice(combinations(screen_virt_space, screened_orbs - k), None):
+                            for tup_noscreen_occ in islice(combinations(noscreen_occ_space, l), None):
+                                for tup_noscreen_virt in islice(combinations(noscreen_virt_space, order - screened_orbs - l), None):
+
+                                    tup = np.array(tup_screen_occ + tup_screen_virt + tup_noscreen_occ + tup_noscreen_virt, dtype=np.int64)
+
+                                    if pi_prune(pi_space, pi_hashes, tup):
+
+                                        yield tup
+
+            # only occupied MOs
+            if ref_virt:
+
+                for tup_screen_occ in islice(combinations(screen_occ_space, screened_orbs), None):
+                    for tup_noscreen_occ in islice(combinations(noscreen_occ_space, order - screened_orbs), None):
+
+                        tup = np.array(tup_screen_occ + tup_noscreen_occ, dtype=np.int64)
+
+                        if pi_prune(pi_space, pi_hashes, tup):
+
+                            yield tup
+
+            # only virtual MOs
+            if ref_occ:
+                
+                for tup_screen_virt in islice(combinations(screen_virt_space, screened_orbs), None):
+                    for tup_noscreen_virt in islice(combinations(noscreen_virt_space, order - screened_orbs), None):
+
+                        tup = np.array(tup_screen_virt + tup_noscreen_virt, dtype=np.int64)
+
+                        if pi_prune(pi_space, pi_hashes, tup):
+
+                            yield tup
 
 
 if __name__ == "__main__":
