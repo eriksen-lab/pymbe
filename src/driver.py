@@ -14,6 +14,7 @@ __status__ = 'Development'
 
 import numpy as np
 from mpi4py import MPI
+import copy
 
 from mbe import main as mbe_main
 from output import main_header, mbe_header, mbe_results, mbe_end, \
@@ -24,7 +25,7 @@ from calculation import CalcCls
 from expansion import ExpCls
 from parallel import MPICls, mpi_finalize
 from tools import n_tuples, occ_prune, virt_prune, inc_dim, inc_shape, write_file
-from ml import train
+from ml import MLCls
 
 
 def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
@@ -33,6 +34,8 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
         """
         # print expansion headers
         print(main_header(mpi=mpi, method=calc.model['method']))
+
+        ml_object = MLCls()
 
         # print output from restarted calculation
         if calc.restart:
@@ -130,9 +133,33 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                               exp.mean_inc[-1], exp.min_inc[-1], exp.max_inc[-1], \
                               exp.mean_ndets[-1], exp.min_ndets[-1], exp.max_ndets[-1]))
 
+            # add data to ml model
+            ml_object.add_data(mol, calc, exp)
+
+            # save incs and hashes
+            if exp.order == calc.thres['start']:
+
+                # load hashes for all orders
+                hashes = []
+                for k in range(exp.order-exp.min_order+1):
+                    buf = exp.prop[calc.target_mbe]['hashes'][k].Shared_query(0)[0] # type: ignore
+                    hashes.append(np.ndarray(buffer=buf, dtype=np.int64, shape=(exp.n_tuples['inc'][k],)))
+
+                hashes_backup = copy.deepcopy(hashes)
+
+                # load increments for all orders
+                inc = []
+                for k in range(exp.order-exp.min_order+1):
+                    buf = exp.prop[calc.target_mbe]['inc'][k].Shared_query(0)[0] # type: ignore
+                    inc.append(np.ndarray(buffer=buf, dtype=np.float64, shape = inc_shape(exp.n_tuples['inc'][k], 1)))
+
+                inc_backup = copy.deepcopy(inc)
+
             # train ml model
-            if (exp.order == calc.thres['start']):
-                model = train(mol, calc, exp)
+            elif exp.order > calc.thres['start']:
+                
+                ml_object.train()
+                ml_object.predict(mol, calc, exp, hashes_backup, inc_backup)
 
             # update screen_orbs
             if exp.order == exp.min_order:
