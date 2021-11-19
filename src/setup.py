@@ -30,6 +30,7 @@ from calculation import CalcCls, set_calc, sanity_check as calculation_sanity_ch
 from expansion import ExpCls
 from kernel import gauge_origin, hf, ref_mo, ints, dipole_ints, base, ref_prop
 from tools import pi_space, natural_keys, assertion
+from interface import chemps2_interface
 
 
 # restart folder
@@ -189,6 +190,11 @@ def _exp(mpi: MPICls, mol: MolCls, calc: CalcCls) -> Tuple[MolCls, CalcCls, ExpC
                                                          calc.ref_space, calc.model, calc.orbs['type'], \
                                                          calc.state, calc.prop['hf']['energy'], \
                                                          calc.prop['hf']['dipole'], calc.base['method'])
+
+            # DMRG calculation
+            if not calc.restart:
+                e, calc.mut_info = chemps2_interface(mol, calc, mol.hcore, mol.eri)
+                print('CheMPS2-CI Energy  = %.15g' % e)
 
         # pyscf hf object not needed anymore
         if mpi.global_master and not calc.restart:
@@ -437,6 +443,9 @@ def restart_write_prop(mol: MolCls, calc: CalcCls) -> None:
             with open(os.path.join(RST, 'transitions.rst'), 'w') as f:
                 dump(transitions, f)
 
+        # write mutual information
+        np.save(os.path.join(RST, 'mut_info'), calc.mut_info)
+
 
 def restart_read_prop(mol: MolCls, calc: CalcCls) -> Tuple[MolCls, CalcCls]:
         """
@@ -483,6 +492,10 @@ def restart_read_prop(mol: MolCls, calc: CalcCls) -> Tuple[MolCls, CalcCls]:
                 with open(os.path.join(RST, files[i]), 'r') as f:
                     transitions = load(f)
                 calc.prop['ref']['trans'] = np.asarray(transitions['ref'])
+
+            # read mutual information
+            if 'mut_info' in files[i]:
+                calc.mut_info = np.load(os.path.join(RST, files[i]))
 
         return mol, calc
 

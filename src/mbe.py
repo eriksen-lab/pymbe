@@ -17,6 +17,10 @@ import numpy as np
 from mpi4py import MPI
 from pyscf import gto
 from typing import Tuple, Set, List, Dict, Union, Any
+import matplotlib.pyplot as plt
+import seaborn as sns
+from itertools import combinations
+import scipy.special as sc
 
 from kernel import e_core_h1e, hubbard_h1e, hubbard_eri, main as kernel_main
 from output import mbe_status, mbe_debug, DIVIDER
@@ -29,6 +33,11 @@ from tools import is_file, read_file, write_file, inc_dim, inc_shape, \
                     core_cas, idx_tril, nelec, hash_1d, hash_2d, hash_lookup, fsum
 
 SCREEN = 1000. # random, non-sensical number
+
+plt.rc('text', **{'usetex': True})
+plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman']})
+
+sns.set_theme()
 
 
 def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
@@ -156,6 +165,85 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, \
         else:
             tup_occ = tup_virt = None
         order_start, occ_start, virt_start = start_idx(exp_occ, exp_virt, tup_occ, tup_virt)
+
+        if exp.order > 8:
+
+            inc_sum = np.zeros((exp.exp_space[0].size, exp.exp_space[0].size), dtype=np.float64)
+
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+            for k in range(exp.min_order, 10):
+
+                i = k - exp.min_order
+
+                tup_idx = 0
+
+                for tup in tuples(exp_occ, exp_virt, ref_occ, ref_virt, k):
+
+                    # compute index
+                    idx = hash_lookup(hashes[i], hash_1d(tup))
+
+                    if idx is not None:
+
+                        if np.abs(inc[i][idx]) > 1.e-10:
+                        
+                            for comb in combinations(tup, 2):
+
+                                inc_sum[tuple(np.array(comb)-mol.ncore)] += np.abs(inc[i][idx]) / sc.binom(k, 2)
+                                inc_sum[tuple(np.flip(np.array(comb)-mol.ncore))] += np.abs(inc[i][idx]) / sc.binom(k, 2)
+
+                        tup_idx += 1
+
+                mut_info_diag = calc.mut_info[np.triu_indices_from(calc.mut_info, k=1)]
+                incs_diag = np.abs(inc_sum[np.triu_indices_from(inc_sum, k=1)])
+
+                mut_info_diag = mut_info_diag[:,np.newaxis]
+
+                a, _, _, _ = np.linalg.lstsq(mut_info_diag, incs_diag, rcond=None)
+
+                if (k % 3 == 0):
+
+                    ax.scatter(mut_info_diag, incs_diag, s=8, marker='.', label='Order ' + str(k), color='C' + str(int((k - exp.min_order) / 3)))
+
+                    #xfit = np.logspace(-1, -6, 1000)
+
+                    #yfit = a * xfit
+
+                    #ax.plot(xfit, yfit, color='C' + str(k - exp.min_order), marker='None')
+
+                yapprox = a * mut_info_diag
+
+                print(k, np.sum((yapprox - incs_diag)**2) / incs_diag.size)
+
+            ax.set_xlabel('Mutual information')
+            ax.set_ylabel('Sum of increments')
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+
+            xlim_left, xlim_right = ax.get_xlim()
+            ylim_bot, ylim_top = ax.get_ylim()
+
+            ax.set_xlim(min(xlim_left, ylim_bot), max(xlim_right, ylim_top))
+            ax.set_ylim(min(xlim_left, ylim_bot), max(xlim_right, ylim_top))
+
+            ax.legend()
+
+            fig.savefig('fit.pdf', bbox_inches='tight')
+
+            fig, axs = plt.subplots(1, 2, figsize=(8, 3.8))
+
+            axs[0].pcolormesh(np.abs(inc_sum))
+            axs[1].pcolormesh(calc.mut_info)
+
+            axs[0].set_title('Increment')
+            axs[1].set_title('Mutual information')
+
+            for ax in axs.flat:
+                ax.set(xlabel='MO', ylabel='MO')
+
+            fig.savefig('mutual_information.pdf', bbox_inches='tight')
+
+            exit()
 
         # loop until no tuples left
         for tup_idx, tup in enumerate(tuples(exp_occ, exp_virt, ref_occ, ref_virt, exp.order, \
