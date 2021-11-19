@@ -61,6 +61,7 @@ class CalcCls:
                 self.mo_coeff: np.ndarray = None
                 self.nelec: Tuple[int, ...] = ()
                 self.ref_space: np.ndarray = None
+                self.mut_info: np.ndarray = None
 
 
 def set_calc(calc: CalcCls) -> CalcCls:
