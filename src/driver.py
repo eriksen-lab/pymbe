@@ -14,7 +14,6 @@ __status__ = 'Development'
 
 import numpy as np
 from mpi4py import MPI
-import copy
 
 from mbe import main as mbe_main
 from output import main_header, mbe_header, mbe_results, mbe_end, \
@@ -25,7 +24,7 @@ from calculation import CalcCls
 from expansion import ExpCls
 from parallel import MPICls, mpi_finalize
 from tools import n_tuples, occ_prune, virt_prune, inc_dim, inc_shape, write_file
-from ml import MLCls
+from ml import main as ml_main, MLCls
 
 
 def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
@@ -34,8 +33,6 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
         """
         # print expansion headers
         print(main_header(mpi=mpi, method=calc.model['method']))
-
-        ml_object = MLCls()
 
         # print output from restarted calculation
         if calc.restart:
@@ -59,6 +56,8 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                 exp.screen_orbs = np.setdiff1d(exp.exp_space[i-exp.min_order], exp.exp_space[i-exp.min_order+1])
                 if 0 < exp.screen_orbs.size:
                     print(screen_results(i, exp.screen_orbs, exp.exp_space))
+
+        ml_object = MLCls(exp.exp_space[0].size, exp.min_order)
 
         # begin or resume mbe expansion depending
         for exp.order in range(exp.start_order, exp.max_order+1):
@@ -84,8 +83,12 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                              1. if exp.order < calc.thres['start'] else calc.thres['perc']))
 
             # main mbe function
-            hashes_win, inc_win, tot, mean_ndets, min_ndets, max_ndets, \
+            if exp.n_tuples['theo'][-1] < ml_object.max_calcs:
+                hashes_win, inc_win, tot, mean_ndets, min_ndets, max_ndets, \
                 mean_inc, min_inc, max_inc = mbe_main(mpi, mol, calc, exp)
+            else:
+                hashes_win, inc_win, tot, mean_ndets, min_ndets, max_ndets, \
+                mean_inc, min_inc, max_inc, ml_object = ml_main(mpi, mol, calc, exp, ml_object)
 
             # append window to hashes
             if len(exp.prop[calc.target_mbe]['hashes']) == len(exp.n_tuples['inc']):
@@ -132,34 +135,6 @@ def master(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls) -> None:
                               exp.order, exp.prop[calc.target_mbe]['tot'], \
                               exp.mean_inc[-1], exp.min_inc[-1], exp.max_inc[-1], \
                               exp.mean_ndets[-1], exp.min_ndets[-1], exp.max_ndets[-1]))
-
-            # add data to ml model
-            ml_object.add_data(mol, calc, exp)
-
-            # save incs and hashes
-            if exp.order == calc.thres['start']:
-
-                # load hashes for all orders
-                hashes = []
-                for k in range(exp.order-exp.min_order+1):
-                    buf = exp.prop[calc.target_mbe]['hashes'][k].Shared_query(0)[0] # type: ignore
-                    hashes.append(np.ndarray(buffer=buf, dtype=np.int64, shape=(exp.n_tuples['inc'][k],)))
-
-                hashes_backup = copy.deepcopy(hashes)
-
-                # load increments for all orders
-                inc = []
-                for k in range(exp.order-exp.min_order+1):
-                    buf = exp.prop[calc.target_mbe]['inc'][k].Shared_query(0)[0] # type: ignore
-                    inc.append(np.ndarray(buffer=buf, dtype=np.float64, shape = inc_shape(exp.n_tuples['inc'][k], 1)))
-
-                inc_backup = copy.deepcopy(inc)
-
-            # train ml model
-            elif exp.order > calc.thres['start']:
-                
-                ml_object.train()
-                ml_object.predict(mol, calc, exp, hashes_backup, inc_backup)
 
             # update screen_orbs
             if exp.order == exp.min_order:
