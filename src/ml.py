@@ -39,7 +39,7 @@ from output import mbe_debug, mbe_status
 SEED = 0
 
 # number of samples to use at current order
-TRAIN_SIZE = 100
+TRAIN_SIZE = 1000
 
 # batch size for SGD algorithm
 BATCH_SIZE = 128
@@ -48,7 +48,7 @@ BATCH_SIZE = 128
 N_EPOCHS = 10000
 
 # number of strata to use
-N_STRATA = 10
+N_STRATA = 6
 
 # seeds
 seed(SEED)
@@ -97,6 +97,7 @@ class MLCls():
                 self.x_train: List[np.ndarray] = []
                 self.y_train: List[np.ndarray] = []
 
+                self.strata_ranges = np.logspace(-1, -10, N_STRATA)
 
         def fit_transform(self, input: np.ndarray) -> np.ndarray:
 
@@ -204,45 +205,51 @@ class MLCls():
                 this function samples random tuples from this order and adds these to training data
                 """
                 # generate random tuples for this order
-                #random_tuples = tuple(random_sample(avail_tuples(tuples(exp_occ, exp_virt, ref_occ, ref_virt, exp.order), exp.order, exp.min_order, mol.nocc, ref_occ, ref_virt, hashes, inc), TRAIN_SIZE))
+                random_tuples = tuple(random_sample(avail_tuples(tuples(exp_occ, exp_virt, ref_occ, ref_virt, exp.order), exp.order, exp.min_order, mol.nocc, ref_occ, ref_virt, hashes, inc), TRAIN_SIZE))
 
                 # allocate space for training 
-                #mo = np.zeros((TRAIN_SIZE, self.n_features), dtype=np.float64)
-                #y = np.empty(TRAIN_SIZE, dtype=np.float64)
+                mo = np.zeros((TRAIN_SIZE, self.n_features), dtype=np.float64)
+                y = np.empty(TRAIN_SIZE, dtype=np.float64)
 
-                #if len(random_tuples) == TRAIN_SIZE:
+                if len(random_tuples) == TRAIN_SIZE:
 
-                #    for tup_idx, (tup, subtup_sum) in enumerate(random_tuples):
+                    for tup_idx, (tup, subtup_sum) in enumerate(random_tuples):
 
-                #        for orb in tup:
-                #            mo[tup_idx, np.where(exp.exp_space[0] == orb)] = 1.
+                        for orb in tup:
+                            mo[tup_idx, np.where(exp.exp_space[0] == orb)] = 1.
 
                         # get core and cas indices
-                #        core_idx, cas_idx = core_cas(mol.nocc, calc.ref_space, tup)
+                        core_idx, cas_idx = core_cas(mol.nocc, calc.ref_space, tup)
 
                         # get h2e indices
-                #        cas_idx_tril = idx_tril(cas_idx)
+                        cas_idx_tril = idx_tril(cas_idx)
 
                         # get h2e_cas
-                #        h2e_cas = eri[cas_idx_tril[:, None], cas_idx_tril]
+                        h2e_cas = eri[cas_idx_tril[:, None], cas_idx_tril]
 
                         # compute e_core and h1e_cas
-                #        e_core, h1e_cas = e_core_h1e(mol.e_nuc, hcore, vhf, core_idx, cas_idx)
+                        e_core, h1e_cas = e_core_h1e(mol.e_nuc, hcore, vhf, core_idx, cas_idx)
 
                         # calculate increment
-                #        y[tup_idx], _, _ = _inc(calc.model, calc.base['method'], calc.orbs['type'], mol.spin, \
-                #                                calc.occup, calc.target_mbe, calc.state, mol.groupname, \
-                #                                calc.orbsym, calc.prop, e_core, h1e_cas, h2e_cas, \
-                #                                core_idx, cas_idx, mol.debug, mol.dipole_ints)
+                        y[tup_idx], _, _ = _inc(calc.model, calc.base['method'], calc.orbs['type'], mol.spin, \
+                                                calc.occup, calc.target_mbe, calc.state, mol.groupname, \
+                                                calc.orbsym, calc.prop, e_core, h1e_cas, h2e_cas, \
+                                                core_idx, cas_idx, mol.debug, mol.dipole_ints)
 
                         # calculate increment
-                #        y[tup_idx] -= subtup_sum
+                        y[tup_idx] -= subtup_sum
 
-                #    self.x_train.append(mo)
-                #    self.y_train.append(y)
+                    self.x_train.append(mo)
+                    self.y_train.append(y)
 
-                ### calculate all tuples for validation set, not only random tuples
 
+        def validate(self, mol: MolCls, calc: CalcCls, exp: ExpCls, exp_occ: np.ndarray, 
+                           exp_virt: np.ndarray, ref_occ: bool, ref_virt: bool, eri: np.ndarray,
+                           hcore: np.ndarray, vhf: np.ndarray, hashes: List[np.ndarray],
+                           inc: List[np.ndarray]):
+                """
+                this function samples random tuples from this order and adds these to training data
+                """
                 #fao = calc.hf.get_fock()
                 #fmo = calc.mo_coeff.T @ fao @ calc.mo_coeff
                 #mocc = calc.mo_coeff[:,calc.occup>0]
@@ -302,18 +309,6 @@ class MLCls():
                         self.y_valid[tup_idx] -= _sum(mol.nocc, calc.target_mbe, exp.min_order, exp.order, \
                                                       inc, hashes, ref_occ, ref_virt, tup)
 
-                #random_tuples = sample(range(0, self.y_valid.size), TRAIN_SIZE)
-
-                #self.x_train.append(self.x_valid[random_tuples, :])
-                #self.y_train.append(self.y_valid[random_tuples])
-
-                ###
-
-
-        def train(self) -> None:
-                """
-                this function trains the ML model
-                """
                 print('training model')
 
                 fig, ax = plt.subplots(figsize=(8, 5))
@@ -455,15 +450,12 @@ class MLCls():
                 # backtransform prediction
                 y_pred = self.inverse_transform(y_pred)
 
-                #np.set_printoptions(threshold=np.inf)
-                #print(np.c_[y_pred, y_calc])
-
                 fig, ax = plt.subplots(figsize=(8, 5))
 
-                #for i in range(np.nonzero(strata_total)[0][0], strata_ranges.size):
+                for i in range(1, self.strata_ranges.size):
 
-                #    rect = patches.Rectangle((strata_ranges[i], strata_ranges[i]), strata_ranges[i-1]-strata_ranges[i], strata_ranges[i-1]-strata_ranges[i], facecolor='black', alpha=0.3)
-                #    ax.add_patch(rect)
+                    rect = patches.Rectangle((self.strata_ranges[i], self.strata_ranges[i]), self.strata_ranges[i-1]-self.strata_ranges[i], self.strata_ranges[i-1]-self.strata_ranges[i], facecolor='black', alpha=0.3)
+                    ax.add_patch(rect)
 
                 ax.scatter(y_calc, y_pred, s=1, marker='.')
 
@@ -483,15 +475,97 @@ class MLCls():
                 exit()
 
 
+        def train(self) -> None:
+                """
+                this function trains the ML model
+                """
+                print('training model')
+
+                fig, ax = plt.subplots(figsize=(8, 5))
+
+                x_train = np.concatenate(self.x_train)
+                y_train = np.abs(np.concatenate(self.y_train)).reshape(-1, 1)
+                #y_train[y_train < 1.e-10] = 1.e-10
+                y_train = self.fit_transform(y_train)
+
+                x_train, y_train = map(torch.as_tensor, (x_train, y_train))
+
+                train_dataset = torch.utils.data.TensorDataset(x_train, y_train)
+
+                train_loader = torch.utils.data.DataLoader(dataset=train_dataset, 
+                                                        batch_size=BATCH_SIZE, 
+                                                        shuffle=True, num_workers=0)
+
+                train_loss = []
+                best_loss: float
+
+                # train the network
+                for epoch in range(1, N_EPOCHS+1):
+
+                    train_loss.append(0.0)
+
+                    # loop over batches
+                    for x_batch, y_batch in train_loader:
+                
+                        # predict y based on x
+                        prediction = self.net(x_batch)
+
+                        # calculate loss in comparison to training data
+                        loss = self.loss_func(prediction, y_batch)
+
+                        # clear gradients
+                        self.optimizer.zero_grad()
+                        
+                        # backpropagation, compute gradients
+                        loss.backward()
+
+                        # add loss to epoch loss
+                        train_loss[-1] += loss.item() * x_batch.size(0)
+
+                        # apply gradients
+                        self.optimizer.step()
+
+                    train_loss[-1] /= len(train_loader)
+
+                    # check if loss has not improved by min_delta for patience epochs
+                    if epoch == 1 or best_loss - train_loss[-1] > self.min_delta:
+
+                        best_loss = train_loss[-1]
+
+                        counter = 0
+
+                    else:
+
+                        counter += 1
+                        
+                        if counter >= self.patience:
+
+                            print("epoch = %4d   training loss = %0.4f" % (epoch, train_loss[-1]))
+
+                            break
+
+                    if not epoch % 10:
+                    
+                        print("epoch = %4d   training loss = %0.4f" % (epoch, train_loss[-1]))
+
+                epochs = np.arange(1, epoch+1)
+
+                ax.plot(epochs, train_loss, color='C0', linewidth=1, linestyle='solid')
+
+                ax.set_xlabel('Epoch')
+                ax.set_ylabel('Training loss')
+
+                fig.savefig('learning_curve.pdf', bbox_inches='tight')
+
+
         def predict(self, order: int, exp_space: np.ndarray, exp_occ: np.ndarray, exp_virt: np.ndarray, 
-                    ref_occ: bool, ref_virt: bool, hashes: np.ndarray, nocc: int) -> Tuple[List[List[Union[np.ndarray, None]]], List[int], List[int], np.ndarray]:
+                    ref_occ: bool, ref_virt: bool, prev_order_hashes: np.ndarray, nocc: int) -> Tuple[List[List[Union[np.ndarray, None]]], List[int], List[int], np.ndarray]:
                 """
                 this function predicts with the ML model
                 """
-                strata_ranges = np.logspace(-1, -10, N_STRATA)
-
                 strata_total = N_STRATA * [0]
                 strata_tups: List[List[Union[np.ndarray, None]]] = [[] for _ in range(N_STRATA)]
+                strata_pred_incs: List[List[Union[float, None]]] = [[] for _ in range(N_STRATA)]
 
                 with torch.no_grad():
 
@@ -510,46 +584,69 @@ class MLCls():
                         y = self.net(x)
 
                         # convert to numpy array
-                        y = y.detach().numpy().reshape(1, -1)
+                        y = y.detach().numpy()
 
                         # backtransform prediction
-                        y = self.inverse_transform(y)
+                        y = self.inverse_transform(y).item()
 
-                        i = N_STRATA - np.searchsorted(strata_ranges[::-1], y)
+                        i = N_STRATA - np.searchsorted(self.strata_ranges[::-1], y)
 
                         if i < N_STRATA:
                             
                             strata_total[i] += 1
 
-                            if hashes.size > 0:
+                            all_subtups_avail = True
 
-                                all_subtups_avail = True
+                            # occupied and virtual subspaces of tuple
+                            tup_occ = tup[tup < nocc]
+                            tup_virt = tup[nocc <= tup]
 
-                                # occupied and virtual subspaces of tuple
-                                tup_occ = tup[tup < nocc]
-                                tup_virt = tup[nocc <= tup]
+                            # loop over subtuples
+                            for tup_sub in tuples(tup_occ, tup_virt, ref_occ, ref_virt, order-1):
 
-                                # loop over subtuples
-                                for tup_sub in tuples(tup_occ, tup_virt, ref_occ, ref_virt, order-1):
+                                # compute index
+                                idx = hash_lookup(prev_order_hashes, hash_1d(tup_sub))
 
-                                    # compute index
-                                    idx = hash_lookup(hashes, hash_1d(tup_sub))
+                                # check if subtuple exists
+                                if idx is None:
 
-                                    # sum and max of subtuple increments
-                                    if idx is None:
+                                    # if subtuple does not exist predict magnitude
+                                    mo = np.zeros(self.n_features, dtype=np.float64)
+
+                                    # set mo features
+                                    for orb in tup_sub:
+                                        mo[np.where(exp_space == orb)] = 1.
+
+                                    # concatenate features and convert to torch tensor
+                                    x = torch.as_tensor(mo)
+                                                                    
+                                    # predict with neural net and convert back to ndarray
+                                    y = self.net(x)
+
+                                    # convert to numpy array
+                                    y = y.detach().numpy()
+
+                                    # backtransform prediction
+                                    y = self.inverse_transform(y).item()
+
+                                    j = N_STRATA - np.searchsorted(self.strata_ranges[::-1], y)
+
+                                    # check if subtuple is predicted to be numerically relevant
+                                    if j < N_STRATA:
 
                                         all_subtups_avail = False
+                                        strata_pred_incs[i].append(y)
                                         break
 
-                                if all_subtups_avail:
+                            if all_subtups_avail:
 
-                                    strata_tups[i].append(tup)
+                                strata_tups[i].append(tup)
 
                 tot_strata = 0.
 
                 for stratum, stratum_total in enumerate(strata_total):
 
-                    tot_strata += stratum_total * strata_ranges[stratum-1]
+                    tot_strata += stratum_total * self.strata_ranges[stratum-1]
 
                 strata_samples = []
 
@@ -560,7 +657,7 @@ class MLCls():
                     # calculate necessary sample size for minimal total variance in worst-case scenario (all increments in stratum are at upper stratum bound)
                     if tot_strata > 0.:
 
-                        strata_samples.append(int(round(min(n_calcs * stratum_total * strata_ranges[stratum-1] / tot_strata, len(stratum_tup)))))
+                        strata_samples.append(int(round(min(n_calcs * stratum_total * self.strata_ranges[stratum-1] / tot_strata, len(stratum_tup)))))
 
                     else:
 
@@ -576,11 +673,13 @@ class MLCls():
                             strata_samples[-1] += n_calcs
                             n_calcs = 0
 
-                        tot_strata -= stratum_total * strata_ranges[stratum-1]
+                        tot_strata -= stratum_total * self.strata_ranges[stratum-1]
 
-                        print('Calculating', strata_samples[-1], 'samples of', stratum_total, 'tuples between', strata_ranges[stratum-1], 'and', strata_ranges[stratum])
+                        print('Calculating', strata_samples[-1], 'samples of', stratum_total, 'tuples in stratum', stratum, 'between', self.strata_ranges[stratum-1], 'and', self.strata_ranges[stratum])
 
-                return strata_tups, strata_total, strata_samples, strata_ranges
+                print()
+
+                return strata_tups, strata_total, strata_samples, strata_pred_incs
 
 
 class Net(torch.nn.Module):
@@ -693,6 +792,9 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, ml_object: MLCls,
             # add data of past orders to ml model
             ml_object.add_data(mol, calc, exp, hashes, inc)
 
+            # validate model
+            #ml_object.validate(mol, calc, exp, exp_occ, exp_virt, ref_occ, ref_virt, eri, hcore, vhf, hashes, inc)
+
             # add sample data from current order to ml model
             ml_object.sample_order(mol, calc, exp, exp_occ, exp_virt, ref_occ, ref_virt, eri, hcore, vhf, hashes, inc)
 
@@ -700,7 +802,7 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, ml_object: MLCls,
             ml_object.train()
 
         # make predictions with ml model
-        strata_tups, strata_total, strata_samples, strata_ranges = ml_object.predict(exp.order, exp.exp_space[0], exp_occ, exp_virt, ref_occ, ref_virt, hashes[-1], mol.nocc)
+        strata_tups, strata_total, strata_samples, strata_pred_incs = ml_object.predict(exp.order, exp.exp_space[0], exp_occ, exp_virt, ref_occ, ref_virt, hashes[-1], mol.nocc)
 
         # actual number of tuples at current order
         exp.n_tuples['calc'][-1] = sum(strata_samples)
@@ -872,6 +974,9 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, ml_object: MLCls,
 
                 tup_idx += 1
 
+            if stratum_total > stratum_sample:
+                print('Errors for stratum', stratum)
+
             if stratum_sample > 0:
 
                 # calculate sample mean of stratum
@@ -888,17 +993,28 @@ def main(mpi: MPICls, mol: MolCls, calc: CalcCls, exp: ExpCls, ml_object: MLCls,
 
                     # calculate variance of the population total
                     var += len(stratum_tups) * (len(stratum_tups) - stratum_sample) * sample_var / stratum_sample
-                    print(len(stratum_tups) * (len(stratum_tups) - stratum_sample) * sample_var / stratum_sample)
+                    print('Sample variance:', len(stratum_tups) * (len(stratum_tups) - stratum_sample) * sample_var / stratum_sample)
 
-                # calculate variance of increments that cannot be constructed due to missing subtuples
-                var += ((stratum_total - len(stratum_tups)) * strata_ranges[stratum-1]) ** 2
-                print(((stratum_total - len(stratum_tups)) * strata_ranges[stratum-1]) ** 2)
+                elif stratum_total > len(stratum_tups):
+
+                    # calculate sample variance for predicted increments in stratum
+                    sample_var = np.var(inc[-1][prev_tup_idx:tup_idx], ddof=1)
+
+                    # calculate variance of increments that cannot be constructed due to missing subtuples
+                    var += (np.sum(strata_pred_incs[stratum])) ** 2
+                    #var += ((stratum_total - len(stratum_tups)) * ml_object.strata_ranges[stratum-1]) ** 2
+                    print('Missing subtuple variance:', ((stratum_total - len(stratum_tups)) * ml_object.strata_ranges[stratum-1]) ** 2)
 
             else:
 
                 # calculate variance of all increments without sample
-                var += (stratum_total * strata_ranges[stratum-1]) ** 2
-                print((stratum_total * strata_ranges[stratum-1]) ** 2)
+                var += (np.sum(strata_pred_incs[stratum])) ** 2
+                #var += (stratum_total * ml_object.strata_ranges[stratum-1]) ** 2
+                if stratum_total > 0:
+                    print('Missing subtuple variance:', (stratum_total * ml_object.strata_ranges[stratum-1]) ** 2)
+
+            if stratum_total > stratum_sample:
+                print()
 
         string = u' RESULT-{:d}:  energy = {:.4e} \u00b1 {:.4e}\n'
         form: Tuple[int, float, float] = (exp.order, energy, 2*np.sqrt(var))
