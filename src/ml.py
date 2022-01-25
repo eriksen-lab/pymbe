@@ -317,6 +317,11 @@ class MLCls():
 
                 for idx, percent in enumerate(percentages):
 
+                    # reset model
+                    for layer in self.net.children():
+                        if hasattr(layer, 'reset_parameters'):
+                            layer.reset_parameters()
+
                     random_tuples = sample(range(0, self.y_valid.size), int(round(percent / 100. * self.y_valid.size)))
 
                     self.x_train.append(self.x_valid[random_tuples, :])
@@ -435,7 +440,7 @@ class MLCls():
                 d9,  = ax.plot([0], color='black', linewidth=1, marker='None', linestyle='solid', label='Training loss')
                 d10,  = ax.plot([0], color='black', linewidth=1, marker='None', linestyle='dashed', label='Validation loss')
 
-                ax.legend([d1, d2, d3, d4, d5, d6, d7, d8, d1, d9, d10], ('Current order training size', d2.get_label(), d3.get_label(), d4.get_label(), d5.get_label(), d6.get_label(), d7.get_label(), d8.get_label(), 'Loss', d9.get_label(), d10.get_label()))
+                ax.legend([d1, d2, d3, d4, d5, d6, d7, d8, d1, d9, d10], ('Current order training size', d2.get_label(), d3.get_label(), d4.get_label(), d5.get_label(), d6.get_label(), d7.get_label(), d8.get_label(), 'Loss', d9.get_label(), d10.get_label()), loc='upper right')
 
                 fig.savefig('learning_curve.pdf', bbox_inches='tight')
 
