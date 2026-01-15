@@ -186,9 +186,11 @@ def test_hash_1d() -> None:
     """
     this function tests hash_1d
     """
-    hash = np.arange(5, dtype=np.int64)
+    arr1 = np.arange(5, dtype=np.int64)
+    arr2 = np.array([0, 1, 2, 3, 5], dtype=np.int64)
 
-    assert hash_1d(hash) == 1974765062269638978
+    assert hash_1d(arr1) == hash(arr1.tobytes())
+    assert hash_1d(arr1) != hash_1d(arr2)
 
 
 @pytest.mark.parametrize(

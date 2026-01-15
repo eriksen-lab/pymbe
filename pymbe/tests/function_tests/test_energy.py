@@ -17,6 +17,7 @@ __status__ = "Development"
 import pytest
 import numpy as np
 from math import comb
+from itertools import chain, product, combinations
 from mpi4py import MPI
 from typing import TYPE_CHECKING
 
@@ -32,8 +33,6 @@ test_cases_mbe = [
     (
         "h2o",
         1,
-        -249055688365223385,
-        9199082625845137542,
         -0.0374123708341898,
         -0.0018267714680604286,
         -0.0374123708341898,
@@ -44,8 +43,6 @@ test_cases_mbe = [
     (
         "h2o",
         2,
-        8509729643108359722,
-        8290417336063232159,
         -0.11605435599270209,
         -0.0001698239845069338,
         -0.15346672682557028,
@@ -124,8 +121,8 @@ def exp(mol: gto.Mole, hf: scf.RHF, mbe: MBE):
 
 
 @pytest.mark.parametrize(
-    argnames="system, order, ref_hashes_sum, ref_hashes_amax, ref_inc_sum, "
-    "ref_inc_amax, ref_mbe_tot_prop, ref_mean_inc, ref_min_inc, ref_max_inc",
+    argnames="system, order, ref_inc_sum, ref_inc_amax, ref_mbe_tot_prop, "
+    "ref_mean_inc, ref_min_inc, ref_max_inc",
     argvalues=test_cases_mbe,
     ids=["-".join([case[0], str(case[1])]) for case in test_cases_mbe],
     indirect=["system"],
@@ -136,8 +133,6 @@ def test_mbe(
     hf: scf.RHF,
     nocc: int,
     order: int,
-    ref_hashes_sum: int,
-    ref_hashes_amax: int,
     ref_inc_sum: float,
     ref_inc_amax: float,
     ref_mbe_tot_prop: np.ndarray,
@@ -204,8 +199,23 @@ def test_mbe(
         [isinstance(item, MPI.Win) for item in exp.hashes[-1] if item is not None]
     )
     assert all([isinstance(item, MPI.Win) for item in exp.incs[-1] if item is not None])
-    assert np.sum(np.concatenate(hashes[-1])) == ref_hashes_sum
-    assert np.amax(np.concatenate(hashes[-1])) == ref_hashes_amax
+    for k in range(exp.order + 1):
+        assert np.array_equal(
+            hashes[-1][k],
+            np.sort(
+                [
+                    hash(
+                        np.fromiter(chain.from_iterable(tup), dtype=np.int64).tobytes()
+                    )
+                    for tup in product(
+                        combinations(exp.exp_space[-1][exp.exp_space[-1] < nocc], k),
+                        combinations(
+                            exp.exp_space[-1][nocc <= exp.exp_space[-1]], exp.order - k
+                        ),
+                    )
+                ]
+            ),
+        )
     assert np.sum(np.concatenate(inc[-1])) == pytest.approx(ref_inc_sum)
     assert np.amax(np.concatenate(inc[-1])) == pytest.approx(ref_inc_amax)
     assert exp.mbe_tot_prop[-1] == pytest.approx(ref_mbe_tot_prop)
@@ -223,7 +233,7 @@ def test_purge(mbe: MBE, exp: EnergyExpCls) -> None:
     """
     this function tests _purge
     """
-    ref_hashes = [
+    start_tups = [
         [
             np.array([], dtype=np.int64),
             np.array([], dtype=np.int64),
@@ -232,12 +242,15 @@ def test_purge(mbe: MBE, exp: EnergyExpCls) -> None:
             np.array([], dtype=np.int64),
             np.array(
                 [
-                    -6318372561352273418,
-                    -5475322122992870313,
-                    -1752257283205524125,
-                    -669804309911520350,
-                    1455941523185766351,
-                    6981656516950638826,
+                    np.array([0, 3], dtype=np.int64),
+                    np.array([0, 4], dtype=np.int64),
+                    np.array([0, 5], dtype=np.int64),
+                    np.array([1, 3], dtype=np.int64),
+                    np.array([1, 4], dtype=np.int64),
+                    np.array([1, 5], dtype=np.int64),
+                    np.array([2, 3], dtype=np.int64),
+                    np.array([2, 4], dtype=np.int64),
+                    np.array([2, 5], dtype=np.int64),
                 ],
                 dtype=np.int64,
             ),
@@ -247,69 +260,67 @@ def test_purge(mbe: MBE, exp: EnergyExpCls) -> None:
             np.array([], dtype=np.int64),
             np.array(
                 [
-                    -8862568739552411231,
-                    -4310406760124882618,
-                    -4205406112023021717,
+                    np.array([0, 3, 4], dtype=np.int64),
+                    np.array([0, 3, 5], dtype=np.int64),
+                    np.array([0, 4, 5], dtype=np.int64),
+                    np.array([1, 3, 4], dtype=np.int64),
+                    np.array([1, 3, 5], dtype=np.int64),
+                    np.array([1, 4, 5], dtype=np.int64),
+                    np.array([2, 3, 4], dtype=np.int64),
+                    np.array([2, 3, 5], dtype=np.int64),
+                    np.array([2, 4, 5], dtype=np.int64),
                 ],
                 dtype=np.int64,
             ),
             np.array(
                 [
-                    -7925134385272954056,
-                    -7216722148388372205,
-                    -6906205837173860435,
-                    -3352798558434503475,
-                    366931854209709639,
-                    6280027850766028273,
+                    np.array([0, 1, 3], dtype=np.int64),
+                    np.array([0, 1, 4], dtype=np.int64),
+                    np.array([0, 1, 5], dtype=np.int64),
+                    np.array([0, 2, 3], dtype=np.int64),
+                    np.array([0, 2, 4], dtype=np.int64),
+                    np.array([0, 2, 5], dtype=np.int64),
+                    np.array([1, 2, 3], dtype=np.int64),
+                    np.array([1, 2, 4], dtype=np.int64),
+                    np.array([1, 2, 5], dtype=np.int64),
                 ],
                 dtype=np.int64,
             ),
             np.array([], dtype=np.int64),
         ],
         [
-            np.array([], dtype=np.int64),
             np.array([], dtype=np.int64),
             np.array(
                 [
-                    -6640293625692100246,
-                    -4012521487842354405,
-                    2993709457496479298,
+                    np.array([0, 3, 4, 5], dtype=np.int64),
+                    np.array([1, 3, 4, 5], dtype=np.int64),
+                    np.array([2, 3, 4, 5], dtype=np.int64),
                 ],
                 dtype=np.int64,
             ),
             np.array(
                 [
-                    -9111224886591032877,
-                    -2930228190932741801,
+                    np.array([0, 1, 3, 4], dtype=np.int64),
+                    np.array([0, 1, 3, 5], dtype=np.int64),
+                    np.array([0, 1, 4, 5], dtype=np.int64),
+                    np.array([0, 2, 3, 4], dtype=np.int64),
+                    np.array([0, 2, 3, 5], dtype=np.int64),
+                    np.array([0, 2, 4, 5], dtype=np.int64),
+                    np.array([1, 2, 3, 4], dtype=np.int64),
+                    np.array([1, 2, 3, 5], dtype=np.int64),
+                    np.array([1, 2, 4, 5], dtype=np.int64),
+                ],
+                dtype=np.int64,
+            ),
+            np.array(
+                [
+                    np.array([0, 1, 2, 3], dtype=np.int64),
+                    np.array([0, 1, 2, 4], dtype=np.int64),
+                    np.array([0, 1, 2, 5], dtype=np.int64),
                 ],
                 dtype=np.int64,
             ),
             np.array([], dtype=np.int64),
-        ],
-    ]
-
-    ref_incs = [
-        [
-            np.array([], dtype=np.float64),
-            np.array([], dtype=np.float64),
-        ],
-        [
-            np.array([], dtype=np.float64),
-            np.array([1.0, 2.0, 4.0, 5.0, 6.0, 8.0], dtype=np.float64),
-            np.array([], dtype=np.float64),
-        ],
-        [
-            np.array([], dtype=np.float64),
-            np.array([1.0, 5.0, 6.0], dtype=np.float64),
-            np.array([1.0, 2.0, 3.0, 4.0, 5.0, 7.0], dtype=np.float64),
-            np.array([], dtype=np.float64),
-        ],
-        [
-            np.array([], dtype=np.float64),
-            np.array([], dtype=np.float64),
-            np.array([3.0, 4.0, 8.0], dtype=np.float64),
-            np.array([1.0, 2.0], dtype=np.float64),
-            np.array([], dtype=np.float64),
         ],
     ]
 
@@ -320,101 +331,19 @@ def test_purge(mbe: MBE, exp: EnergyExpCls) -> None:
     exp.order = 4
     exp.n_incs = [
         np.array([0, 0], dtype=np.int64),
-        np.array([0, 10, 0], dtype=np.int64),
+        np.array([0, 9, 0], dtype=np.int64),
         np.array([0, 9, 9, 0], dtype=np.int64),
         np.array([0, 3, 9, 3, 0], dtype=np.int64),
     ]
 
     start_hashes = [
         [
-            np.array([], dtype=np.int64),
-            np.array([], dtype=np.int64),
-        ],
-        [
-            np.array([], dtype=np.int64),
-            np.array(
-                [
-                    -6318372561352273418,
-                    -5475322122992870313,
-                    -2211238527921376434,
-                    -1752257283205524125,
-                    -669804309911520350,
-                    1455941523185766351,
-                    2796798554289973955,
-                    6981656516950638826,
-                    7372096627385889923,
-                    7504768460337078519,
-                ],
-                dtype=np.int64,
-            ),
-            np.array([], dtype=np.int64),
-        ],
-        [
-            np.array([], dtype=np.int64),
-            np.array(
-                [
-                    -8862568739552411231,
-                    -7370655119274612396,
-                    -6346674104600383423,
-                    -6103692259034244091,
-                    -4310406760124882618,
-                    -4205406112023021717,
-                    680656656239891583,
-                    3949415985151233945,
-                    8046408145842912366,
-                ],
-                dtype=np.int64,
-            ),
-            np.array(
-                [
-                    -7925134385272954056,
-                    -7216722148388372205,
-                    -6906205837173860435,
-                    -3352798558434503475,
-                    366931854209709639,
-                    4429162622039029653,
-                    6280027850766028273,
-                    7868645139422709341,
-                    8474590989972277172,
-                ],
-                dtype=np.int64,
-            ),
-            np.array([], dtype=np.int64),
-        ],
-        [
-            np.array([], dtype=np.int64),
-            np.array(
-                [
-                    775579459894020071,
-                    2515975357592924865,
-                    6975445416347248252,
-                ],
-                dtype=np.int64,
-            ),
-            np.array(
-                [
-                    -9191542714830049336,
-                    -8945201412191574338,
-                    -6640293625692100246,
-                    -4012521487842354405,
-                    -3041224019630807622,
-                    -864833587293421682,
-                    1344711228121337165,
-                    2993709457496479298,
-                    4799605789003109011,
-                ],
-                dtype=np.int64,
-            ),
-            np.array(
-                [
-                    -9111224886591032877,
-                    -2930228190932741801,
-                    7524854823186007981,
-                ],
-                dtype=np.int64,
-            ),
-            np.array([], dtype=np.int64),
-        ],
+            np.sort(
+                np.array([hash(tup.tobytes()) for tup in nocc_tups], dtype=np.int64)
+            )
+            for nocc_tups in order_tups
+        ]
+        for order_tups in start_tups
     ]
 
     hashes: List[List[np.ndarray]] = []
@@ -499,34 +428,40 @@ def test_purge(mbe: MBE, exp: EnergyExpCls) -> None:
     assert np.array_equal(exp.n_incs[1], np.array([0, 6, 0], dtype=np.int64))
     assert np.array_equal(exp.n_incs[2], np.array([0, 3, 6, 0], dtype=np.int64))
     assert np.array_equal(exp.n_incs[3], np.array([0, 0, 3, 2, 0], dtype=np.int64))
-    assert all(
-        np.array_equal(purged, ref)
-        for purged, ref in zip(purged_hashes[0], ref_hashes[0])
-    )
-    assert all(
-        np.array_equal(purged, ref)
-        for purged, ref in zip(purged_hashes[1], ref_hashes[1])
-    )
-    assert all(
-        np.array_equal(purged, ref)
-        for purged, ref in zip(purged_hashes[2], ref_hashes[2])
-    )
-    assert all(
-        np.array_equal(purged, ref)
-        for purged, ref in zip(purged_hashes[3], ref_hashes[3])
-    )
-    assert all(
-        np.array_equal(purged, ref) for purged, ref in zip(purged_incs[0], ref_incs[0])
-    )
-    assert all(
-        np.array_equal(purged, ref) for purged, ref in zip(purged_incs[1], ref_incs[1])
-    )
-    assert all(
-        np.array_equal(purged, ref) for purged, ref in zip(purged_incs[2], ref_incs[2])
-    )
-    assert all(
-        np.array_equal(purged, ref) for purged, ref in zip(purged_incs[3], ref_incs[3])
-    )
+    for order_idx in range(exp.order):
+        for nocc_idx in range(exp.n_incs[order_idx].size):
+            sort_idx = np.argsort(
+                np.array(
+                    [hash(tup.tobytes()) for tup in start_tups[order_idx][nocc_idx]],
+                    dtype=np.int64,
+                )
+            )
+            assert np.array_equal(
+                purged_hashes[order_idx][nocc_idx],
+                [
+                    ref_hash
+                    for ref_hash, ref_tup in zip(
+                        start_hashes[order_idx][nocc_idx],
+                        start_tups[order_idx][nocc_idx][sort_idx],
+                    )
+                    if exp.screen_orbs[0] not in ref_tup
+                ],
+            )
+            assert np.array_equal(
+                purged_incs[order_idx][nocc_idx],
+                [
+                    ref_inc
+                    for ref_inc, ref_tup in zip(
+                        np.arange(
+                            1,
+                            start_tups[order_idx][nocc_idx].size + 1,
+                            dtype=np.float64,
+                        ),
+                        start_tups[order_idx][nocc_idx][sort_idx],
+                    )
+                    if exp.screen_orbs[0] not in ref_tup
+                ],
+            )
 
 
 @pytest.mark.parametrize(
