@@ -2,9 +2,9 @@ name: Python application
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
 
 permissions:
   contents: read
@@ -26,12 +26,11 @@ jobs:
       with:
         python-version: "3.10"
         
-    - name: Install dependencies
+    - name: Install dependencies and PyMBE
       run: |
-        sudo apt-get -qq install libblas-dev
         python -m pip install --upgrade pip
-        pip install numpy scipy h5py mpi4py seaborn pytest pytest-cov mypy pyscf
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install .
+        pip install pytest pytest-cov mypy
       shell: bash
 
     - name: Fetch MBECC library
@@ -48,4 +47,15 @@ jobs:
     - name: Testing
       run: |
         export PYTHONHASHSEED=0
-        python3 -m pytest -x --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+        mkdir -p junit
+        python3 -m pytest -x \
+          --junitxml=junit/test-results.xml \
+          --cov=pymbe \
+          --cov-report=xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: coverage.xml
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
