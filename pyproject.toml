@@ -1,0 +1,11 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pymbe"
+version = "1.0.0"
+description = "A Many-Body Expanded Correlation Code"
+authors = [{ name = "Jonas Greiner", email = "jongr@kemi.dtu.dk" }]
+requires-python = ">=3.7"
+dependencies = ["numpy", "mpi4py", "pyscf"]

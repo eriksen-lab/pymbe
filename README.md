@@ -45,7 +45,11 @@ Features
 Usage
 -----
 
-PyMBE expects both itself and PySCF to be properly exported to Python. This can either be achieved by installing through pip (in the case of PySCF), having a pymbe.pth/pyscf.pth file with the corresponding path in the lib/Python3.X/site-packages directory of your Python distribution or by including the paths in the environment variable `$PYTHONPATH`. PyMBE also requires the PYTHON_HASH_SEED environment variable to be set to 0 (export PYTHON_HASH_SEED=0) for reproducibility reasons and will complain otherwise. Furthermore, the mpi4py implementation of the MPI standard needs to be installed, built upon an MPI-3 library.\
+PyMBE can be installed through pip:
+```sh
+pip install .
+```
+PyMBE also requires the PYTHON_HASH_SEED environment variable to be set to 0 (export PYTHON_HASH_SEED=0) for reproducibility reasons and will complain otherwise. Furthermore, the mpi4py implementation of the MPI standard needs to be installed, built upon an MPI-3 library.\
 Once these requirements are satisfied, PyMBE can be started by importing the MBE class and creating a MBE object while passing input data and keywords as keyword arguments. Possible keyword arguments are:
 
 * **expansion model**
