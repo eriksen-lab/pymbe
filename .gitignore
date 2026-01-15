@@ -1,5 +1,8 @@
 *pyc
 *bak
+.DS_Store
+.python-version
+.vscode/
 .mypy_cache
 src/.mypy_cache
 examples/energy/*/output
