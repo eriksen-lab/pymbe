@@ -3,6 +3,7 @@ name: Python application
 on:
   push:
     branches: [ "main", "dev" ]
+  # use pull_request_target to have access to secrets.
   pull_request_target:
     branches: [ "main", "dev" ]
 
@@ -12,14 +13,14 @@ permissions:
 jobs:
   testing:
     runs-on: ubuntu-latest
+    # use environment to require approval before using secrets
     environment: test-with-secrets
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      # Crucial: use pull_request_target to have access to secrets.
-      # However, this checks out the base branch (main/dev) by default.
-      # To test the PR code, you must explicitly check out the PR branch.
+      # pull_request_target checks out the base branch (main/dev) by default. To test 
+      # the PR code, explicitly check out the PR branch.
       with:
         ref: ${{ github.event.pull_request.head.sha || github.sha }}
     
@@ -42,7 +43,6 @@ jobs:
 
     - name: Fetch MBECC library
       run: |
-        gh release list --repo eriksen-lab/mbecc
         gh release download --repo eriksen-lab/mbecc --pattern libmbecc.so
         echo "MBECCLIB = 'libmbecc.so'" > pymbe/settings.py
       env:
