@@ -17,10 +17,10 @@ __status__ = "Development"
 from mpi4py import MPI
 import numpy as np
 from pyscf import lib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from typing import cast, Tuple, Optional
+    from typing import Tuple, Optional
 
     from pymbe.pymbe import MBE
 
