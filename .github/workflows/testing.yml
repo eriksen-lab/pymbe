@@ -35,6 +35,7 @@ jobs:
 
     - name: Fetch MBECC library
       run: |
+        gh release list --repo eriksen-lab/mbecc
         gh release download --repo eriksen-lab/mbecc --pattern libmbecc.so
         echo "MBECCLIB = 'libmbecc.so'" > pymbe/settings.py
       env:
