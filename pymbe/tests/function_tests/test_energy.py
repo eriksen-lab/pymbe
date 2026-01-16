@@ -357,7 +357,7 @@ def test_purge(mbe: MBE, exp: EnergyExpCls) -> None:
         exp.incs.append([])
         for l in range(order + 1):
             hashes_win = MPI.Win.Allocate_shared(
-                8 * exp.n_incs[k][l], 8, comm=mbe.mpi.local_comm  # type: ignore
+                8 * exp.n_incs[k][l], 8, comm=mbe.mpi.local_comm
             )
             buf = hashes_win.Shared_query(0)[0]
             hashes[-1].append(
@@ -371,7 +371,7 @@ def test_purge(mbe: MBE, exp: EnergyExpCls) -> None:
             exp.hashes[-1].append(hashes_win)
 
             inc_win = MPI.Win.Allocate_shared(
-                8 * exp.n_incs[k][l], 8, comm=mbe.mpi.local_comm  # type: ignore
+                8 * exp.n_incs[k][l], 8, comm=mbe.mpi.local_comm
             )
             buf = inc_win.Shared_query(0)[0]
             incs[-1].append(

@@ -204,10 +204,12 @@ def test_hash_lookup(b: np.ndarray, present: bool) -> None:
     """
     a = np.arange(10, dtype=np.int64)
 
+    occur_idx = hash_lookup(a, b)
     if present:
-        assert (hash_lookup(a, b) == b).all()
+        assert occur_idx is not None
+        assert (occur_idx == b).all()
     else:
-        assert hash_lookup(a, b) is None
+        assert occur_idx is None
 
 
 @pytest.mark.parametrize(

@@ -370,7 +370,7 @@ class RDMExpCls(
         return packedRDMCls(rdm_dict["rdm1"], rdm_dict["rdm2"])
 
     def _allocate_shared_inc(
-        self, size: int, allocate: bool, comm: MPI.Comm, tup_norb: int, *args: int
+        self, size: int, allocate: bool, comm: MPI.Intracomm, tup_norb: int, *args: int
     ) -> Optional[Tuple[MPI.Win, MPI.Win]]:
         """
         this function allocates a shared increment window
@@ -384,12 +384,12 @@ class RDMExpCls(
                 MPI.Win.Allocate_shared(
                     8 * size * packedRDMCls.rdm1_size[tup_norb - 1] if allocate else 0,
                     8,
-                    comm=comm,  # type: ignore
+                    comm=comm,
                 ),
                 MPI.Win.Allocate_shared(
                     8 * size * packedRDMCls.rdm2_size[tup_norb - 1] if allocate else 0,
                     8,
-                    comm=comm,  # type: ignore
+                    comm=comm,
                 ),
             )
             if size > 0
@@ -480,24 +480,23 @@ class RDMExpCls(
         """
         # size of arrays on every rank
         counts_dict = {
-            "rdm1": np.array(comm.gather(send_inc.rdm1.size)),
-            "rdm2": np.array(comm.gather(send_inc.rdm2.size)),
+            "rdm1": comm.gather(send_inc.rdm1.size),
+            "rdm2": comm.gather(send_inc.rdm2.size),
         }
 
         # receiving arrays
-        recv_inc_dict: Dict[str, Optional[np.ndarray]] = {}
+        recv_inc_dict: Dict[str, Optional[Tuple[np.ndarray, List[int]]]] = {}
         if recv_inc is not None:
-            recv_inc_dict["rdm1"] = recv_inc.rdm1
-            recv_inc_dict["rdm2"] = recv_inc.rdm2
+            if counts_dict["rdm1"] is not None and counts_dict["rdm2"] is not None:
+                recv_inc_dict["rdm1"] = (recv_inc.rdm1, counts_dict["rdm1"])
+                recv_inc_dict["rdm2"] = (recv_inc.rdm2, counts_dict["rdm2"])
+            else:
+                recv_inc_dict["rdm1"] = recv_inc_dict["rdm2"] = None
         else:
             recv_inc_dict["rdm1"] = recv_inc_dict["rdm2"] = None
 
-        comm.Gatherv(
-            send_inc.rdm1.ravel(), (recv_inc_dict["rdm1"], counts_dict["rdm1"]), root=0
-        )
-        comm.Gatherv(
-            send_inc.rdm2.ravel(), (recv_inc_dict["rdm2"], counts_dict["rdm2"]), root=0
-        )
+        comm.Gatherv(send_inc.rdm1.ravel(), recv_inc_dict["rdm1"], root=0)
+        comm.Gatherv(send_inc.rdm2.ravel(), recv_inc_dict["rdm2"], root=0)
 
     @staticmethod
     def _free_inc(inc_win: Tuple[MPI.Win, MPI.Win]) -> None:

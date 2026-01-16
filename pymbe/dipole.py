@@ -118,9 +118,7 @@ class DipoleExpCls(SingleTargetExpCls[np.ndarray]):
 
         # allocate dipole integrals in shared mem
         self.dipole_ints_win: MPI.Win = MPI.Win.Allocate_shared(
-            8 * 3 * self.norb**2 if mpi.local_master else 0,
-            8,
-            comm=mpi.local_comm,  # type: ignore
+            8 * 3 * self.norb**2 if mpi.local_master else 0, 8, comm=mpi.local_comm
         )
 
         # open dipole integrals in shared memory
@@ -329,15 +327,13 @@ class DipoleExpCls(SingleTargetExpCls[np.ndarray]):
         return mpi_reduce(comm, values, root=0, op=op)
 
     def _allocate_shared_inc(
-        self, size: int, allocate: bool, comm: MPI.Comm, *args: int
+        self, size: int, allocate: bool, comm: MPI.Intracomm, *args: int
     ) -> Optional[MPI.Win]:
         """
         this function allocates a shared increment window
         """
         return (
-            MPI.Win.Allocate_shared(
-                8 * size * 3 if allocate else 0, 8, comm=comm  # type: ignore
-            )
+            MPI.Win.Allocate_shared(8 * size * 3 if allocate else 0, 8, comm=comm)
             if size > 0
             else None
         )

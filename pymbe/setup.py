@@ -102,6 +102,18 @@ def clustering_setup(mbe: MBE, max_cluster_size: int):
 
     # sanity check
     sanity_check(mbe)
+    if (
+        isinstance(mbe.nelec, list)
+        and isinstance(mbe.fci_state_sym, list)
+        and isinstance(mbe.fci_state_root, list)
+        and isinstance(mbe.fci_state_weights, list)
+    ):
+        raise ValueError(
+            "orbital clustering not possible for state-averaged properties, "
+            "calculation must only have keywords describing a single state and can "
+            "therefore not be lists (nelec, fci_state_sym, fci_state_root, "
+            "fci_state_weights keyword arguments)"
+        )
 
     # write restart files
     if mbe.rst and not mbe.restarted:

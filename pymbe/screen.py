@@ -63,7 +63,7 @@ def fixed_screen(
         while norb < nscreen:
             idx = rng.integers(len(exp_clusters))
             norb += exp_clusters[idx].size
-            remove_idx.append(idx)
+            remove_idx.append(idx.item())
 
     else:
         cluster_screen = [np.abs(screen[cluster[0]]) for cluster in exp_clusters]
@@ -77,7 +77,7 @@ def fixed_screen(
             if norb >= nscreen:
                 break
             norb += exp_clusters[idx].size
-            remove_idx.append(idx)
+            remove_idx.append(idx.item())
 
     return remove_idx
 

@@ -302,15 +302,13 @@ class EnergyExpCls(SingleTargetExpCls[float]):
         ).item()
 
     def _allocate_shared_inc(
-        self, size: int, allocate: bool, comm: MPI.Comm, *args: int
+        self, size: int, allocate: bool, comm: MPI.Intracomm, *args: int
     ) -> Optional[MPI.Win]:
         """
         this function allocates a shared increment window
         """
         return (
-            MPI.Win.Allocate_shared(
-                8 * size if allocate else 0, 8, comm=comm  # type: ignore
-            )
+            MPI.Win.Allocate_shared(8 * size if allocate else 0, 8, comm=comm)
             if size > 0
             else None
         )

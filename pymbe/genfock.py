@@ -167,7 +167,7 @@ class GenFockExpCls(
                 else 0
             ),
             8,
-            comm=mpi.local_comm,  # type: ignore
+            comm=mpi.local_comm,
         )
         self.eri_goaa_win: MPI.Win = MPI.Win.Allocate_shared(
             (
@@ -176,7 +176,7 @@ class GenFockExpCls(
                 else 0
             ),
             8,
-            comm=mpi.local_comm,  # type: ignore
+            comm=mpi.local_comm,
         )
         self.eri_gaao_win: MPI.Win = MPI.Win.Allocate_shared(
             (
@@ -185,12 +185,12 @@ class GenFockExpCls(
                 else 0
             ),
             8,
-            comm=mpi.local_comm,  # type: ignore
+            comm=mpi.local_comm,
         )
         self.eri_gaaa_win: MPI.Win = MPI.Win.Allocate_shared(
             8 * self.full_norb * self.norb**3 if mpi.local_master else 0,
             8,
-            comm=mpi.local_comm,  # type: ignore
+            comm=mpi.local_comm,
         )
 
         # open additional integrals in shared memory
@@ -686,7 +686,12 @@ class GenFockExpCls(
         )
 
     def _allocate_shared_inc(
-        self, size: int, allocate: bool, comm: MPI.Comm, tup_norb: int, tup_nocc: int
+        self,
+        size: int,
+        allocate: bool,
+        comm: MPI.Intracomm,
+        tup_norb: int,
+        tup_nocc: int,
     ) -> Optional[Tuple[MPI.Win, MPI.Win, MPI.Win]]:
         """
         this function allocates a shared increment window
@@ -702,11 +707,7 @@ class GenFockExpCls(
 
         return (
             (
-                MPI.Win.Allocate_shared(
-                    8 * size if allocate else 0,
-                    8,
-                    comm=comm,  # type: ignore
-                ),
+                MPI.Win.Allocate_shared(8 * size if allocate else 0, 8, comm=comm),
                 MPI.Win.Allocate_shared(
                     (
                         8 * size * packedGenFockCls.rdm1_size[tup_norb - 1]
@@ -714,12 +715,12 @@ class GenFockExpCls(
                         else 0
                     ),
                     8,
-                    comm=comm,  # type: ignore
+                    comm=comm,
                 ),
                 MPI.Win.Allocate_shared(
                     8 * size * gen_fock_norb * self.full_norb if allocate else 0,
                     8,
-                    comm=comm,  # type: ignore
+                    comm=comm,
                 ),
             )
             if size > 0
@@ -841,35 +842,34 @@ class GenFockExpCls(
         """
         # size of arrays on every rank
         counts_dict = {
-            "energy": np.array(comm.gather(send_inc.energy.size)),
-            "rdm1": np.array(comm.allgather(send_inc.rdm1.size)),
-            "gen_fock": np.array(comm.gather(send_inc.gen_fock.size)),
+            "energy": comm.gather(send_inc.energy.size),
+            "rdm1": comm.allgather(send_inc.rdm1.size),
+            "gen_fock": comm.gather(send_inc.gen_fock.size),
         }
 
         # receiving arrays
-        recv_inc_dict: Dict[str, Optional[np.ndarray]] = {}
+        recv_inc_dict: Dict[str, Optional[Tuple[np.ndarray, List[int]]]] = {}
         if recv_inc is not None:
-            recv_inc_dict["energy"] = recv_inc.energy
-            recv_inc_dict["rdm1"] = recv_inc.rdm1
-            recv_inc_dict["gen_fock"] = recv_inc.gen_fock
+            if (
+                counts_dict["energy"] is not None
+                and counts_dict["rdm1"] is not None
+                and counts_dict["gen_fock"] is not None
+            ):
+                recv_inc_dict["energy"] = (recv_inc.energy, counts_dict["energy"])
+                recv_inc_dict["rdm1"] = (recv_inc.rdm1, counts_dict["rdm1"])
+                recv_inc_dict["gen_fock"] = (recv_inc.gen_fock, counts_dict["gen_fock"])
+            else:
+                recv_inc_dict["energy"] = recv_inc_dict["rdm1"] = recv_inc_dict[
+                    "gen_fock"
+                ] = None
         else:
             recv_inc_dict["energy"] = recv_inc_dict["rdm1"] = recv_inc_dict[
                 "gen_fock"
             ] = None
 
-        comm.Gatherv(
-            send_inc.energy, (recv_inc_dict["energy"], counts_dict["energy"]), root=0
-        )
-        comm.Gatherv(
-            send_inc.rdm1.ravel(),
-            (recv_inc_dict["rdm1"], counts_dict["rdm1"]),
-            root=0,
-        )
-        comm.Gatherv(
-            send_inc.gen_fock.ravel(),
-            (recv_inc_dict["gen_fock"], counts_dict["gen_fock"]),
-            root=0,
-        )
+        comm.Gatherv(send_inc.energy, recv_inc_dict["energy"], root=0)
+        comm.Gatherv(send_inc.rdm1.ravel(), recv_inc_dict["rdm1"], root=0)
+        comm.Gatherv(send_inc.gen_fock.ravel(), recv_inc_dict["gen_fock"], root=0)
 
     @staticmethod
     def _free_inc(inc_win: Tuple[MPI.Win, MPI.Win, MPI.Win]) -> None:

@@ -2617,9 +2617,9 @@ def write_file_mult(
         filename = os.path.join(RST, f"{string}_{order}")
 
     if isinstance(arrs, list):
-        np.savez(os.path.join(RST, filename), *arrs)
+        np.savez(os.path.join(RST, filename), *arrs, allow_pickle=False)
     else:
-        np.savez(os.path.join(RST, filename), **arrs)
+        np.savez(os.path.join(RST, filename), allow_pickle=False, **arrs)
 
 
 def read_file(string: str, order: Optional[int] = None) -> np.ndarray:
@@ -2847,7 +2847,7 @@ def bit_parity(arr: np.ndarray):
     """
     # try numpy function
     try:
-        count = np.bitwise_count(arr)  # type: ignore[attr-defined]
+        count = np.bitwise_count(arr)
     # otherwise optimal Hamming weight algorithm
     except:
         s55 = 0x55555555

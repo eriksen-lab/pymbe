@@ -659,9 +659,7 @@ class ExpCls(
         """
         # allocate hcore in shared mem
         self.hcore_win: MPI.Win = MPI.Win.Allocate_shared(
-            8 * self.norb**2 if mpi.local_master else 0,
-            8,
-            comm=mpi.local_comm,  # type: ignore
+            8 * self.norb**2 if mpi.local_master else 0, 8, comm=mpi.local_comm
         )
         self.hcore = open_shared_win(self.hcore_win, np.float64, 2 * (self.norb,))
 
@@ -677,7 +675,7 @@ class ExpCls(
         self.eri_win: MPI.Win = MPI.Win.Allocate_shared(
             8 * (self.norb * (self.norb + 1) // 2) ** 2 if mpi.local_master else 0,
             8,
-            comm=mpi.local_comm,  # type: ignore
+            comm=mpi.local_comm,
         )
         self.eri = open_shared_win(
             self.eri_win, np.float64, 2 * (self.norb * (self.norb + 1) // 2,)
@@ -695,7 +693,7 @@ class ExpCls(
         self.vhf_win: MPI.Win = MPI.Win.Allocate_shared(
             8 * self.nocc * self.norb**2 if mpi.local_master else 0,
             8,
-            comm=mpi.local_comm,  # type: ignore
+            comm=mpi.local_comm,
         )
         self.vhf = open_shared_win(
             self.vhf_win, np.float64, (self.nocc, self.norb, self.norb)
@@ -864,7 +862,7 @@ class ExpCls(
                         MPI.Win.Allocate_shared(
                             8 * n_incs if mpi.local_master else 0,
                             8,
-                            comm=mpi.local_comm,  # type: ignore
+                            comm=mpi.local_comm,
                         )
                         if n_incs > 0
                         else None
@@ -1281,30 +1279,31 @@ class ExpCls(
                         inc_lst[tup_nocc] = []
 
                         # number of tuples for every rank
-                        recv_counts = np.array(mpi.global_comm.gather(hashes_arr.size))
+                        recv_counts = mpi.global_comm.gather(hashes_arr.size)
 
                         # buffer to store hashes and increments
+                        hash_buf: Optional[Tuple[np.ndarray, List[int]]]
+                        inc_buf: Optional[IncType]
                         if mpi.global_master:
-                            hash_buf: Optional[np.ndarray] = hashes[-1][tup_nocc][
+                            assert recv_counts is not None
+                            hash_buf = (
+                                hashes[-1][tup_nocc][
+                                    inc_idx[tup_nocc] : inc_idx[tup_nocc]
+                                    + np.sum(recv_counts)
+                                ],
+                                recv_counts,
+                            )
+                            inc_buf = inc[-1][tup_nocc][
                                 inc_idx[tup_nocc] : inc_idx[tup_nocc]
                                 + np.sum(recv_counts)
                             ]
-                            inc_buf: Optional[IncType] = inc[-1][tup_nocc][
-                                inc_idx[tup_nocc] : inc_idx[tup_nocc]
-                                + np.sum(recv_counts)
-                            ]
+                            inc_idx[tup_nocc] += np.sum(recv_counts)
                         else:
                             hash_buf = inc_buf = None
 
                         # gatherv hashes and increments onto global master
-                        mpi.global_comm.Gatherv(
-                            hashes_arr, (hash_buf, recv_counts), root=0
-                        )
+                        mpi.global_comm.Gatherv(hashes_arr, hash_buf, root=0)
                         self._mpi_gatherv_inc(mpi.global_comm, inc_arr, inc_buf)
-
-                        # increment restart index
-                        if mpi.global_master:
-                            inc_idx[tup_nocc] += np.sum(recv_counts)
 
                     # reduce number of calculations onto global master
                     n_calc = mpi_reduce(
@@ -1509,17 +1508,18 @@ class ExpCls(
             inc_arr = self._init_inc_arr_from_lst(inc_lst.pop(0), self.order, tup_nocc)
 
             # number of tuples for every rank
-            recv_counts = np.array(mpi.global_comm.gather(hashes_arr.size))
+            recv_counts = mpi.global_comm.gather(hashes_arr.size)
 
             # buffer to store hashes and increments
             if mpi.global_master:
-                hash_buf = hashes[-1][tup_nocc][-np.sum(recv_counts) :]
+                assert recv_counts is not None
+                hash_buf = (hashes[-1][tup_nocc][-np.sum(recv_counts) :], recv_counts)
                 inc_buf = inc[-1][tup_nocc][-np.sum(recv_counts) :]
             else:
                 hash_buf = inc_buf = None
 
             # gatherv hashes and increments onto global master
-            mpi.global_comm.Gatherv(hashes_arr, (hash_buf, recv_counts), root=0)
+            mpi.global_comm.Gatherv(hashes_arr, hash_buf, root=0)
             self._mpi_gatherv_inc(mpi.global_comm, inc_arr, inc_buf)
 
             # bcast hashes among local masters
@@ -2317,7 +2317,7 @@ class ExpCls(
                 self._free_hashes_incs(self.hashes[k][l], self.incs[k][l])
 
                 # number of hashes for every rank
-                recv_counts = np.array(mpi.global_comm.allgather(hashes_arr.size))
+                recv_counts = mpi.global_comm.allgather(hashes_arr.size)
 
                 # update n_incs
                 self.n_incs[k][l] = int(np.sum(recv_counts))
@@ -2327,7 +2327,7 @@ class ExpCls(
                     MPI.Win.Allocate_shared(
                         8 * self.n_incs[k][l] if mpi.local_master else 0,
                         8,
-                        comm=mpi.local_comm,  # type: ignore
+                        comm=mpi.local_comm,
                     )
                     if self.n_incs[k][l] > 0
                     else None
@@ -2897,7 +2897,7 @@ class ExpCls(
         """
 
     def _load_hashes(
-        self, local_master: bool, local_comm: MPI.Comm, rst_read: bool
+        self, local_master: bool, local_comm: MPI.Intracomm, rst_read: bool
     ) -> Tuple[List[List[np.ndarray]], List[Optional[MPI.Win]]]:
         """
         this function loads all previous-order hashes and initializes the current-order
@@ -2926,7 +2926,7 @@ class ExpCls(
                     MPI.Win.Allocate_shared(
                         8 * self.n_incs[-1][l] if local_master else 0,
                         8,
-                        comm=local_comm,  # type: ignore
+                        comm=local_comm,
                     )
                     if self.n_incs[-1][l] > 0
                     else None
@@ -2952,7 +2952,7 @@ class ExpCls(
         """
 
     def _load_inc(
-        self, local_master: bool, local_comm: MPI.Comm, rst_read: bool
+        self, local_master: bool, local_comm: MPI.Intracomm, rst_read: bool
     ) -> Tuple[List[List[IncType]], List[Optional[MPIWinType]]]:
         """
         this function loads all previous-order increments and initializes the
@@ -2998,7 +2998,7 @@ class ExpCls(
 
     @abstractmethod
     def _allocate_shared_inc(
-        self, size: int, allocate: bool, comm: MPI.Comm, tup_norb: int, tup_nocc
+        self, size: int, allocate: bool, comm: MPI.Intracomm, tup_norb: int, tup_nocc
     ) -> Optional[MPIWinType]:
         """
         this function allocates a shared increment window
@@ -3407,7 +3407,7 @@ class SingleTargetExpCls(
 
     @abstractmethod
     def _allocate_shared_inc(
-        self, size: int, allocate: bool, comm: MPI.Comm, *args: int
+        self, size: int, allocate: bool, comm: MPI.Intracomm, *args: int
     ) -> Optional[MPI.Win]:
         """
         this function allocates a shared increment window
@@ -3458,9 +3458,17 @@ class SingleTargetExpCls(
         this function performs a MPI gatherv operation on the increments
         """
         # size of arrays on every rank
-        recv_counts = np.array(comm.gather(send_inc.size))
+        recv_counts = comm.gather(send_inc.size)
 
-        comm.Gatherv(send_inc, (recv_inc, recv_counts), root=0)
+        comm.Gatherv(
+            send_inc,
+            (
+                (recv_inc, recv_counts)
+                if recv_inc is not None and recv_counts is not None
+                else None
+            ),
+            root=0,
+        )
 
     @staticmethod
     def _free_inc(inc_win: MPI.Win) -> None:
