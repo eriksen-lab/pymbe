@@ -3,7 +3,7 @@ name: Python application
 on:
   push:
     branches: [ "main", "dev" ]
-  pull_request:
+  pull_request_target:
     branches: [ "main", "dev" ]
 
 permissions:
@@ -12,9 +12,16 @@ permissions:
 jobs:
   testing:
     runs-on: ubuntu-latest
+    environment: test-with-secrets
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      # Crucial: use pull_request_target to have access to secrets.
+      # However, this checks out the base branch (main/dev) by default.
+      # To test the PR code, you must explicitly check out the PR branch.
+      with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
     
     - name: Set up MPI
       uses: mpi4py/setup-mpi@v1
