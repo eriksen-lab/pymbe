@@ -39,8 +39,7 @@ jobs:
         gh release download --repo eriksen-lab/mbecc --pattern libmbecc.so
         echo "MBECCLIB = 'libmbecc.so'" > pymbe/settings.py
       env:
-        GH_TOKEN: ${{ github.token }}
-        GITHUB_TOKEN: ${{ secrets.MBECC_RELEASE_ACCESS }}
+        GH_TOKEN: ${{ secrets.MBECC_RELEASE_ACCESS }}
         
       shell: bash
 
