@@ -40,7 +40,6 @@ jobs:
         echo "MBECCLIB = 'libmbecc.so'" > pymbe/settings.py
       env:
         GH_TOKEN: ${{ secrets.MBECC_RELEASE_ACCESS }}
-        
       shell: bash
 
     - name: Type checking
