@@ -28,7 +28,7 @@ def mbe_example(rst=True):
         ncas = 8
 
         # number of orbitals
-        norb = mol.nao.item()
+        norb = mol.nao
 
         # number of electrons in correlated space
         nelecas = (mol.nelec[0] - nocc, mol.nelec[1] - nocc)
