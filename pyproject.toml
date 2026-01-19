@@ -9,3 +9,10 @@ description = "A Many-Body Expanded Correlation Code"
 authors = [{ name = "Jonas Greiner", email = "jongr@kemi.dtu.dk" }]
 requires-python = ">=3.7"
 dependencies = ["numpy", "mpi4py", "pyscf"]
+
+[tool.coverage.run]
+source = ["pymbe"]
+omit = [
+    "pymbe/tests/*",
+    "pymbe/examples/*",
+]

@@ -62,7 +62,6 @@ jobs:
           --junitxml=test-results.xml \
           --cov=pymbe \
           --cov-report=xml
-          --cov-omit="pymbe/tests/*,pymbe/examples/*"
 
     - name: Publish Test Results
       uses: EnricoMi/publish-unit-test-result-action@v2
