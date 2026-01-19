@@ -1,5 +1,8 @@
 ![](doc/logo/pymbe_logo.png "PyMBE")
 
+![License](https://img.shields.io/github/license/eriksen-lab/pymbe)
+![CI](https://github.com/eriksen-lab/pymbe/actions/workflows/testing.yml/badge.svg)
+[![codecov](https://codecov.io/gh/eriksen-lab/pymbe/graph/badge.svg?token=09K293HU48)](https://codecov.io/gh/eriksen-lab/pymbe)
 [![DOI](https://zenodo.org/badge/852764849.svg)](https://zenodo.org/doi/10.5281/zenodo.13752712)
 
 PyMBE: A Many-Body Expanded Correlation Code 
@@ -15,7 +18,7 @@ Authors
 -------
 
 * Dr. Janus Juul Eriksen (Technical University of Denmark, main author)
-* Jonas Greiner (Johannes Gutenberg University Mainz, author). 
+* Jonas Greiner (Technical University of Denmark, author). 
 
 Prerequisites
 -------------
