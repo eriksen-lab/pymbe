@@ -369,6 +369,37 @@ class RDMExpCls(
 
         return packedRDMCls(rdm_dict["rdm1"], rdm_dict["rdm2"])
 
+    def _write_target_list_file(
+        self, target_lst: List[RDMCls], file: str, order: int
+    ) -> None:
+        """
+        this function writes a list of targets restart files
+        """
+        n_incs = len(target_lst)
+
+        rdm1 = np.empty((n_incs, self.norb, self.norb), dtype=np.float64)
+        rdm2 = np.empty(
+            (n_incs, self.norb, self.norb, self.norb, self.norb), dtype=np.float64
+        )
+
+        for i, inc in enumerate(target_lst):
+            rdm1[i] = inc.rdm1
+            rdm2[i] = inc.rdm2
+
+        np.savez(os.path.join(RST, file + f"_{order}"), rdm1=rdm1, rdm2=rdm2)
+
+    @staticmethod
+    def _read_target_list_file(file: str) -> List[RDMCls]:
+        """
+        this function reads a list of targets restart files
+        """
+        target_dict = np.load(os.path.join(RST, file))
+
+        return [
+            RDMCls(rdm1, rdm2)
+            for rdm1, rdm2 in zip(target_dict["rdm1"], target_dict["rdm2"])
+        ]
+
     def _allocate_shared_inc(
         self, size: int, allocate: bool, comm: MPI.Intracomm, tup_norb: int, *args: int
     ) -> Optional[Tuple[MPI.Win, MPI.Win]]:
@@ -521,6 +552,15 @@ class RDMExpCls(
         )
         self.screen[order - 1]["sum_abs"][tup] += np.sum(np.abs(inc_tup.rdm1))
 
+    def add_cas_target(
+        self, target_full: RDMCls, target_tup: RDMCls, idx: np.ndarray, nocc: int
+    ) -> None:
+        """
+        this function adds a target for a smaller active space inplace to a full target
+        """
+        # add to total target
+        target_full[idx] += target_tup
+
     def _update_inc_stats(
         self,
         inc_tup: RDMCls,
@@ -533,8 +573,8 @@ class RDMExpCls(
         """
         this function updates the increment statistics
         """
-        # add to total rdm
-        mean_inc[cas_idx] += inc_tup
+        # add to mean target
+        self.add_cas_target(mean_inc, inc_tup, cas_idx, self.nocc)
 
         return min_inc, mean_inc, max_inc
 

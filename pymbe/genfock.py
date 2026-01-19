@@ -685,6 +685,44 @@ class GenFockExpCls(
             target_dict["energy"], target_dict["rdm1"], target_dict["gen_fock"]
         )
 
+    def _write_target_list_file(
+        self, target_lst: List[GenFockCls], file: str, order: int
+    ) -> None:
+        """
+        this function writes list of targets restart files
+        """
+        n_incs = len(target_lst)
+
+        energy = np.empty(n_incs, dtype=np.float64)
+        rdm1 = np.empty((n_incs, self.norb, self.norb), dtype=np.float64)
+        gen_fock = np.empty((n_incs, self.norb, self.full_norb), dtype=np.float64)
+
+        for i, inc in enumerate(target_lst):
+            energy[i] = inc.energy
+            rdm1[i] = inc.rdm1
+            gen_fock[i] = inc.gen_fock
+
+        np.savez(
+            os.path.join(RST, file + f"_{order}"),
+            energy=energy,
+            rdm1=rdm1,
+            gen_fock=gen_fock,
+        )
+
+    @staticmethod
+    def _read_target_list_file(file: str) -> List[GenFockCls]:
+        """
+        this function reads list of targets restart files
+        """
+        target_dict = np.load(os.path.join(RST, file))
+
+        return [
+            GenFockCls(energy, rdm1, gen_fock)
+            for energy, rdm1, gen_fock in zip(
+                target_dict["energy"], target_dict["rdm1"], target_dict["gen_fock"]
+            )
+        ]
+
     def _allocate_shared_inc(
         self,
         size: int,
@@ -784,8 +822,7 @@ class GenFockExpCls(
             (len(inc_lst), packedGenFockCls.rdm1_size[-1]), dtype=np.float64
         )
         gen_fock = np.empty(
-            (len(inc_lst), gen_fock_norb, self.full_norb),
-            dtype=np.float64,
+            (len(inc_lst), gen_fock_norb, self.full_norb), dtype=np.float64
         )
 
         # fill arrays
@@ -895,6 +932,22 @@ class GenFockExpCls(
         )
         self.screen[order - 1]["sum_abs"][tup] += np.sum(np.abs(inc_tup.gen_fock))
 
+    def add_cas_target(
+        self,
+        target_full: GenFockCls,
+        target_tup: GenFockCls,
+        idx: np.ndarray,
+        nocc: int,
+    ) -> None:
+        """
+        this function adds a target for a smaller active space inplace to a full target
+        """
+        # get indices for generalized Fock matrix
+        gen_fock_idx = np.concatenate((np.arange(nocc), idx[nocc <= idx]))
+
+        # add to total target
+        target_full[idx, gen_fock_idx] += target_tup
+
     def _update_inc_stats(
         self,
         inc_tup: GenFockCls,
@@ -907,13 +960,8 @@ class GenFockExpCls(
         """
         this function updates the increment statistics
         """
-        # get indices for generalized Fock matrix
-        gen_fock_idx = np.concatenate(
-            (np.arange(self.nocc), cas_idx[self.nocc <= cas_idx])
-        )
-
-        # add to total rdm
-        mean_inc[cas_idx, gen_fock_idx] += inc_tup
+        # add to mean target
+        self.add_cas_target(mean_inc, inc_tup, cas_idx, self.nocc)
 
         return min_inc, mean_inc, max_inc
 
